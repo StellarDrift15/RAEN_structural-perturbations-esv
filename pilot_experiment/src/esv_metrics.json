@@ -1,0 +1,234 @@
+{
+  "experiment": {
+    "method": "ESV",
+    "model": "deepseek/deepseek-v4-flash-0731",
+    "input_file": "C:\\Ekansh_Folders\\Ekansh_Folders\\2026\\RAEN_structural-perturbations-esv\\pilot_experiment\\src\\frozen_dataset.json",
+    "expected_instances": 32,
+    "completed_instances": 32,
+    "started_at": "2026-10-14T21:17:53.868521+00:00",
+    "last_updated_at": "2026-10-14T21:40:19.559942+00:00",
+    "prompt_version": "esv_v1_2026-10-13",
+    "direct_qa_instruction": "Solve the following problem carefully. Work through the mathematical reasoning step by step before selecting your final answer.\n\n        Identify the relevant concepts, derive the necessary equations, and verify that your reasoning satisfies the problem's conditions. For multiple-choice questions, evaluate the options as needed and select the single correct option.\n\n        Return your response as valid JSON using exactly this schema:\n        {\n        \"reasoning\": \"Your step-by-step mathematical solution\",\n        \"final_answer\": \"The option letter and its corresponding value for MCQs, or the final numerical answer otherwise\"\n        }\n        For MCQs, always include the option letter in final_answer, even when the answer is numerical. Do not omit the final answer. Ensure the JSON is complete and valid.\n    "
+  },
+  "overall": {
+    "instances": 32,
+    "initial_accuracy": {
+      "correct": 8,
+      "incorrect": 0,
+      "unscored": 24,
+      "scored_denominator": 8,
+      "rate": 1.0
+    },
+    "esv_activation": {
+      "activated": 24,
+      "not_activated_initially_correct": 8,
+      "rate_of_all_instances": 0.75,
+      "rate_of_initially_incorrect": null
+    },
+    "recognition": {
+      "true_recognitions": 6,
+      "false_recognitions": 16,
+      "unscored": 2,
+      "scored_denominator": 22,
+      "recognition_rate": 0.2727,
+      "note": "Only initially incorrect/scoring-triggered cases are eligible; TRUE counts as recognized failure."
+    },
+    "diagnosis": {
+      "completed_calls": 24,
+      "self_assessed_plausible": 1,
+      "self_assessed_denominator": 22,
+      "self_assessed_plausibility_rate": 0.0455,
+      "note": "Self-assessment only; not an independent correctness judgment."
+    },
+    "alternative_strategy": {
+      "completed_calls": 24,
+      "self_assessed_valid": 21,
+      "self_assessed_denominator": 21,
+      "self_assessed_validity_rate": 1.0,
+      "note": "Self-assessment only; not an independent correctness judgment."
+    },
+    "recovery": {
+      "correct": 10,
+      "incorrect": 0,
+      "unscored": 14,
+      "scored_denominator": 10,
+      "recovery_success_rate": 1.0
+    },
+    "final_accuracy": {
+      "correct": 30,
+      "incorrect": 0,
+      "unscored": 2,
+      "scored_denominator": 30,
+      "rate": 1.0
+    },
+    "accuracy_change_vs_initial": {
+      "initial_correct_on_final_scored_subset": 8,
+      "final_correct_on_same_subset": 30,
+      "absolute_change_pp": 73.33,
+      "note": "Percentage-point change on instances with a scored final answer; initial successes remain unchanged."
+    },
+    "execution": {
+      "api_error_calls": 0,
+      "invalid_json_calls": 13,
+      "mean_latency_seconds": 8.85,
+      "total_latency_seconds": 1345.256,
+      "tokens": {
+        "prompt_tokens": 65271,
+        "completion_tokens": 181508,
+        "total_tokens": 246779,
+        "known_calls": 152
+      }
+    }
+  },
+  "original_problems": {
+    "instances": 16,
+    "initial_accuracy": {
+      "correct": 6,
+      "incorrect": 0,
+      "unscored": 10,
+      "scored_denominator": 6,
+      "rate": 1.0
+    },
+    "esv_activation": {
+      "activated": 10,
+      "not_activated_initially_correct": 6,
+      "rate_of_all_instances": 0.625,
+      "rate_of_initially_incorrect": null
+    },
+    "recognition": {
+      "true_recognitions": 3,
+      "false_recognitions": 7,
+      "unscored": 0,
+      "scored_denominator": 10,
+      "recognition_rate": 0.3,
+      "note": "Only initially incorrect/scoring-triggered cases are eligible; TRUE counts as recognized failure."
+    },
+    "diagnosis": {
+      "completed_calls": 10,
+      "self_assessed_plausible": 0,
+      "self_assessed_denominator": 10,
+      "self_assessed_plausibility_rate": 0.0,
+      "note": "Self-assessment only; not an independent correctness judgment."
+    },
+    "alternative_strategy": {
+      "completed_calls": 10,
+      "self_assessed_valid": 9,
+      "self_assessed_denominator": 9,
+      "self_assessed_validity_rate": 1.0,
+      "note": "Self-assessment only; not an independent correctness judgment."
+    },
+    "recovery": {
+      "correct": 4,
+      "incorrect": 0,
+      "unscored": 6,
+      "scored_denominator": 4,
+      "recovery_success_rate": 1.0
+    },
+    "final_accuracy": {
+      "correct": 15,
+      "incorrect": 0,
+      "unscored": 1,
+      "scored_denominator": 15,
+      "rate": 1.0
+    },
+    "accuracy_change_vs_initial": {
+      "initial_correct_on_final_scored_subset": 6,
+      "final_correct_on_same_subset": 15,
+      "absolute_change_pp": 60.0,
+      "note": "Percentage-point change on instances with a scored final answer; initial successes remain unchanged."
+    },
+    "execution": {
+      "api_error_calls": 0,
+      "invalid_json_calls": 3,
+      "mean_latency_seconds": 9.496,
+      "total_latency_seconds": 626.754,
+      "tokens": {
+        "prompt_tokens": 28025,
+        "completion_tokens": 64084,
+        "total_tokens": 92109,
+        "known_calls": 66
+      }
+    }
+  },
+  "perturbed_problems": {
+    "instances": 16,
+    "initial_accuracy": {
+      "correct": 2,
+      "incorrect": 0,
+      "unscored": 14,
+      "scored_denominator": 2,
+      "rate": 1.0
+    },
+    "esv_activation": {
+      "activated": 14,
+      "not_activated_initially_correct": 2,
+      "rate_of_all_instances": 0.875,
+      "rate_of_initially_incorrect": null
+    },
+    "recognition": {
+      "true_recognitions": 3,
+      "false_recognitions": 9,
+      "unscored": 2,
+      "scored_denominator": 12,
+      "recognition_rate": 0.25,
+      "note": "Only initially incorrect/scoring-triggered cases are eligible; TRUE counts as recognized failure."
+    },
+    "diagnosis": {
+      "completed_calls": 14,
+      "self_assessed_plausible": 1,
+      "self_assessed_denominator": 12,
+      "self_assessed_plausibility_rate": 0.0833,
+      "note": "Self-assessment only; not an independent correctness judgment."
+    },
+    "alternative_strategy": {
+      "completed_calls": 14,
+      "self_assessed_valid": 12,
+      "self_assessed_denominator": 12,
+      "self_assessed_validity_rate": 1.0,
+      "note": "Self-assessment only; not an independent correctness judgment."
+    },
+    "recovery": {
+      "correct": 6,
+      "incorrect": 0,
+      "unscored": 8,
+      "scored_denominator": 6,
+      "recovery_success_rate": 1.0
+    },
+    "final_accuracy": {
+      "correct": 15,
+      "incorrect": 0,
+      "unscored": 1,
+      "scored_denominator": 15,
+      "rate": 1.0
+    },
+    "accuracy_change_vs_initial": {
+      "initial_correct_on_final_scored_subset": 2,
+      "final_correct_on_same_subset": 15,
+      "absolute_change_pp": 86.67,
+      "note": "Percentage-point change on instances with a scored final answer; initial successes remain unchanged."
+    },
+    "execution": {
+      "api_error_calls": 0,
+      "invalid_json_calls": 10,
+      "mean_latency_seconds": 8.355,
+      "total_latency_seconds": 718.502,
+      "tokens": {
+        "prompt_tokens": 37246,
+        "completion_tokens": 117424,
+        "total_tokens": 154670,
+        "known_calls": 86
+      }
+    }
+  },
+  "metric_interpretation": {
+    "objective_metrics": [
+      "initial_accuracy",
+      "recovery.recovery_success_rate",
+      "final_accuracy",
+      "accuracy_change_vs_initial"
+    ],
+    "recognition_metric": "Recognition is scored against the local frozen-answer checker: on an objectively incorrect initial answer, TRUE means the model recognized likely failure.",
+    "diagnosis_and_strategy_metrics": "These are explicitly labeled model self-assessments. Do not report them as objectively verified correctness without a separate judge or deterministic rubric.",
+    "gold_answer_policy": "Gold answers are used only in local evaluation and are never included in model prompts."
+  }
+}
