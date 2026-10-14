@@ -1,43 +1,43 @@
 {
   "models": {
-    "a": "qwen/qwen3-30b-a3b-instruct-2507",
-    "b": "deepseek/deepseek-v3.2",
-    "c": "qwen/qwen3.5-9b"
+    "a": "deepseek/deepseek-v4-flash-0731",
+    "b": "qwen/qwen3.5-35b-a3b",
+    "c": "openai/gpt-oss-120b"
   },
   "confidence_threshold": 0.6,
   "problems_processed": 20,
   "problems_requested": 20,
-  "num_pairs": 13,
+  "num_pairs": 16,
   "pairs": [
     {
       "id": 0,
       "source": "JEE Adv 2016 Paper 1",
-      "source_index": 39,
+      "source_index": 37,
       "type": "MCQ",
-      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - MCQ\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nLet $S=\\left\\{x \\in(-\\pi, \\pi): x \\neq 0, \\pm \\frac{\\pi}{2}\\right\\}$. The sum of all distinct solutions of the equation $\\sqrt{3} \\sec x+\\operatorname{cosec} x+2(\\tan x-\\cot x)=0$ in the set $S$ is equal to\n\n(A) $-\\frac{7 \\pi}{9}$\n\n(B) $-\\frac{2 \\pi}{9}$\n\n(C) 0\n\n(D) $\\frac{5 \\pi}{9}$\n\n\n",
+      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - MCQ\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nLet $-\\frac{\\pi}{6}<\\theta<-\\frac{\\pi}{12}$. Suppose $\\alpha_{1}$ and $\\beta_{1}$ are the roots of the equation $x^{2}-2 x \\sec \\theta+1=0$ and $\\alpha_{2}$ and $\\beta_{2}$ are the roots of the equation $x^{2}+2 x \\tan \\theta-1=0$. If $\\alpha_{1}>\\beta_{1}$ and $\\alpha_{2}>\\beta_{2}$, then $\\alpha_{1}+\\beta_{2}$ equals\n\n(A) $2(\\sec \\theta-\\tan \\theta)$\n\n(B) $2 \\sec \\theta$\n\n(C) $-2 \\tan \\theta$\n\n(D) 0\n\n\n",
       "original_gold": "C",
-      "perturbed_problem": "Let $S=\\left\\{x \\in(-\\pi, \\pi): x \\neq 0, \\pm \\frac{\\pi}{2}, \\pm \\frac{\\pi}{3}\\right\\}$. The sum of all distinct solutions of the equation $\\sqrt{3} \\sec x+\\operatorname{cosec} x+2(\\tan x-\\cot x)=0$ in the set $S$ is equal to\n\n(A) -\\frac{7\\pi}{9}\n\n(B) -\\frac{2\\pi}{9}\n\n(C) 0\n\n(D) \\frac{5\\pi}{9}",
-      "answer_prime": "C",
+      "perturbed_problem": "Let \\frac{\\pi}{12}<\\theta<\\frac{\\pi}{6}. Suppose \\alpha_1 and \\beta_1 are the roots of the equation x^2-2x\\sec\\theta+1=0 and \\alpha_2 and \\beta_2 are the roots of the equation x^2+2x\\tan\\theta-1=0. If \\alpha_1>\\beta_1 and \\alpha_2>\\beta_2, then \\alpha_1+\\beta_2 equals\n\n(A) $2(\\sec\\theta+\\tan\\theta)$\n\n(B) $2\\sec\\theta$\n\n(C) $-2\\tan\\theta$\n\n(D) 0",
+      "answer_prime": "D",
       "attempts_used": 1,
-      "original_strategy": "Use symmetry of trigonometric functions over $(-\\pi, \\pi)$ and exploit cancellation of odd-function components to show that sum of solutions is zero.",
-      "changed_condition": "Added exclusion of $x = \\pm \\frac{\\pi}{3}$, breaking the symmetry that previously allowed cancellation of solution pairs.",
-      "alternative_strategy": "Convert all terms to sine and cosine, simplify the equation algebraically, solve for $x$ in $(-\\pi, \\pi)$ excluding specified points, and sum the distinct valid solutions numerically.",
+      "original_strategy": "Use the quadratic formula and the given negative angle to set \\sec\\theta>0 and \\tan\\theta<0, yielding \\alpha_1=\\sec\\theta-\\tan\\theta and \\beta_2=-\\tan\\theta-\\sec\\theta, so the sum is -2\\tan\\theta.",
+      "changed_condition": "The interval is changed from -\\pi/6<\\theta<-\\pi/12 to \\pi/12<\\theta<\\pi/6, reversing the sign of \\tan\\theta while keeping \\sec\\theta positive.",
+      "alternative_strategy": "Resolve the sign of \\tan\\theta in the new interval: since \\tan\\theta>0, the larger root of the first equation is \\alpha_1=\\sec\\theta+\\tan\\theta, while the second equation gives \\beta_2=-\\sec\\theta-\\tan\\theta; their sum is 0.",
       "validation": {
         "model_a": {
           "confidence": 0.95,
-          "answer_prime": "C",
+          "answer_prime": "D",
           "naive_answer": "C"
         },
         "model_b": {
-          "confidence": 0.95,
-          "answer_prime": "C",
-          "naive_answer": null,
+          "confidence": 1.0,
+          "answer_prime": "D",
+          "naive_answer": "C",
           "valid_problem": true,
           "strategy_status": "INVALID"
         },
         "model_c": {
           "confidence": 0.99,
-          "answer_prime": "C",
+          "answer_prime": "D",
           "naive_answer": "C",
           "valid_problem": true,
           "strategy_status": "INVALID"
@@ -47,68 +47,68 @@
     {
       "id": 1,
       "source": "JEE Adv 2016 Paper 1",
-      "source_index": 41,
+      "source_index": 38,
       "type": "MCQ",
-      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - MCQ\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nThe least value of $\\alpha \\in \\mathbb{R}$ for which $4 \\alpha x^{2}+\\frac{1}{x} \\geq 1$, for all $x>0$, is\n\n(A) $\\frac{1}{64}$\n\n(B) $\\frac{1}{32}$\n\n(C) $\\frac{1}{27}$\n\n(D) $\\frac{1}{25}$\n\n\n",
-      "original_gold": "C",
-      "perturbed_problem": "The least value of $\\alpha \\in \\mathbb{R}$ for which $4\\alpha x^2 + \\frac{1}{x} \\geq 1$ holds for all $x > 0$ and $x \\neq 1$ is\n\n(A) $\\frac{1}{64}$\n\n(B) $\\frac{1}{32}$\n\n(C) $\\frac{1}{27}$\n\n(D) $\\frac{1}{25}$",
-      "answer_prime": "C",
+      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - MCQ\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nA debate club consists of 6 girls and 4 boys. A team of 4 members is to be selected from this club including the selection of a captain (from among these 4 members) for the team. If the team has to include at most one boy, then the number of ways of selecting the team is\n\n(A) 380\n\n(B) 320\n\n(C) 260\n\n(D) 95\n\n\n",
+      "original_gold": "A",
+      "perturbed_problem": "A debate club consists of 6 girls and 4 boys. A team of 4 members is to be selected from this club including the selection of a captain (from among these 4 members) for the team. If the team has to include at most one boy, and the captain must be a girl, then the number of ways of selecting the team is\n\n(A) 240\n\n(B) 380</option_C>380\n\n(C) 95\n\n(D) 300",
+      "answer_prime": "D",
       "attempts_used": 1,
-      "original_strategy": "Apply AM-GM inequality or calculus to minimize $4\\alpha x^2 + \\frac{1}{x}$ and enforce minimum ≥ 1.",
-      "changed_condition": "Removed the condition at $x = 1$, making the inequality required for all $x > 0$ except $x = 1$.",
-      "alternative_strategy": "Check behavior near $x=1$ and use limit analysis; consider piecewise minimization and boundary limits to find the minimal $\\alpha$.",
+      "original_strategy": "Count possible member teams by cases (0 boys and 1 boy), then multiply every member team by 4 because each 4-member team has 4 possible captains.",
+      "changed_condition": "Added the structural restriction that the captain must be a girl, whereas originally the captain could be any one of the 4 selected members.",
+      "alternative_strategy": "Split by number of boys, then multiply 0-boy member choices by 4 and 1-boy member choices by 3 before adding.",
       "validation": {
         "model_a": {
-          "confidence": 0.85,
-          "answer_prime": "C",
-          "naive_answer": "C"
+          "confidence": 0.95,
+          "answer_prime": "D",
+          "naive_answer": "B"
         },
         "model_b": {
-          "confidence": 0.99,
-          "answer_prime": "C",
-          "naive_answer": "AC",
+          "confidence": 1.0,
+          "answer_prime": "D",
+          "naive_answer": "B",
           "valid_problem": true,
           "strategy_status": "INVALID"
         },
         "model_c": {
-          "confidence": 1.0,
-          "answer_prime": "C",
-          "naive_answer": "C",
+          "confidence": 0.99,
+          "answer_prime": "D",
+          "naive_answer": "B",
           "valid_problem": true,
-          "strategy_status": "STILL_VALID"
+          "strategy_status": "INVALID"
         }
       }
     },
     {
       "id": 2,
       "source": "JEE Adv 2016 Paper 1",
-      "source_index": 42,
-      "type": "MCQ(multiple)",
-      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - MCQ(multiple)\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nConsider a pyramid $O P Q R S$ located in the first octant $(x \\geq 0, y \\geq 0, z \\geq 0)$ with $O$ as origin, and $O P$ and $O R$ along the $x$-axis and the $y$-axis, respectively. The base $O P Q R$ of the pyramid is a square with $O P=3$. The point $S$ is directly above the mid-point $T$ of diagonal $O Q$ such that $T S=3$. Then\n\n(A) the acute angle between $O Q$ and $O S$ is $\\frac{\\pi}{3}$\n\n(B) the equation of the plane containing the triangle $O Q S$ is $x-y=0$\n\n(C) the length of the perpendicular from $P$ to the plane containing the triangle $O Q S$ is $\\frac{3}{\\sqrt{2}}$\n\n(D) the perpendicular distance from $O$ to the straight line containing $R S$ is $\\sqrt{\\frac{15}{2}}$\n\n\n",
-      "original_gold": "BCD",
-      "perturbed_problem": "Consider a pyramid $O P Q R S$ located in the first octant $(x \\geq 0, y \\geq 0, z \\geq 0)$ with $O$ as origin, and $O P$ and $O R$ along the $x$-axis and the $y$-axis, respectively. The base $O P Q R$ of the pyramid is a square with $O P=3$. The point $S$ lies such that the vector $\\vec{TS}$ makes a $45^\\circ$ angle with the $z$-axis and has length $3$, where $T$ is the midpoint of diagonal $O Q$. Then\n\n(A) the acute angle between $O Q$ and $O S$ is $\\frac{\\pi}{3}$\n\n(B) the equation of the plane containing the triangle $O Q S$ is $x - y = 0$\n\n(C) the length of the perpendicular from $P$ to the plane containing the triangle $O Q S$ is $\\frac{3}{\\sqrt{2}}$\n\n(D) the perpendicular distance from $O$ to the straight line containing $R S$ is $\\sqrt{\\frac{15}{2}}$",
-      "answer_prime": "BC",
-      "attempts_used": 2,
-      "original_strategy": "Assume $S$ lies directly above $T$ along the $z$-axis (i.e., $\\vec{TS}$ is parallel to the $z$-axis), so $S = (T_x, T_y, 3)$, and compute coordinates accordingly.",
-      "changed_condition": "The vector $\\vec{TS}$ makes a $45^\\circ$ angle with the $z$-axis and has length 3, so its direction is not purely vertical; $S$ is not on the vertical line above $T$.",
-      "alternative_strategy": "Use vector geometry: compute $T$, then express $\\vec{TS}$ as a vector of length 3 making $45^\\circ$ with $z$-axis. Use dot product to find its $z$-component, then determine possible horizontal components (in $xy$-plane) consistent with the $45^\\circ$ angle. Then compute coordinates of $S$ and verify all options.",
+      "source_index": 39,
+      "type": "MCQ",
+      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - MCQ\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nLet $S=\\left\\{x \\in(-\\pi, \\pi): x \\neq 0, \\pm \\frac{\\pi}{2}\\right\\}$. The sum of all distinct solutions of the equation $\\sqrt{3} \\sec x+\\operatorname{cosec} x+2(\\tan x-\\cot x)=0$ in the set $S$ is equal to\n\n(A) $-\\frac{7 \\pi}{9}$\n\n(B) $-\\frac{2 \\pi}{9}$\n\n(C) 0\n\n(D) $\\frac{5 \\pi}{9}$\n\n\n",
+      "original_gold": "C",
+      "perturbed_problem": "Let \\(T=\\left\\{x \\in(0, \\pi): x \\neq \\frac{\\pi}{2}\\right\\}\\). The sum of all distinct solutions of the equation \\(\\sqrt{3} \\sec x+\\operatorname{cosec} x+2(\\tan x-\\cot x)=0\\) in the set \\(T\\) is equal to\n\n(A) $\\(\\frac{8 \\pi}{9}\\)$\n\n(B) $\\(0\\)$\n\n(C) $\\(\\frac{2 \\pi}{3}\\)$\n\n(D) $\\(\\frac{\\pi}{3}\\)$",
+      "answer_prime": "A",
+      "attempts_used": 1,
+      "original_strategy": "Multiply by \\(\\sin x\\cos x\\), rewrite \\(\\sqrt3\\sin x+\\cos x=2\\sin(x+\\pi/6)\\), solve \\(\\sin(x+\\pi/6)=\\cos2x\\), then sum all solutions found in the symmetric interval \\((-π,π)\\); the symmetric interval makes the total sum \\(0\\).",
+      "changed_condition": "The interval was changed from the symmetric set \\((-π,π)\\setminus\\{0,\\pm π/2\\}\\) to the half-interval \\((0,π)\\setminus\\{π/2\\}\\), removing all negative solutions and breaking the symmetric cancellation.",
+      "alternative_strategy": "Solve the general trigonometric equation first, obtaining \\(x=π/9+2kπ/3\\) or \\(x=-π/3+2kπ\\), then restrict the parameter \\(k\\) to keep only solutions in \\((0,π)\\).",
       "validation": {
         "model_a": {
           "confidence": 0.95,
-          "answer_prime": "D",
-          "naive_answer": "BCD"
+          "answer_prime": "A",
+          "naive_answer": "B"
         },
         "model_b": {
-          "confidence": 0.95,
-          "answer_prime": "BC",
-          "naive_answer": null,
+          "confidence": 1.0,
+          "answer_prime": "A",
+          "naive_answer": "B",
           "valid_problem": true,
           "strategy_status": "INVALID"
         },
         "model_c": {
-          "confidence": 0.9,
-          "answer_prime": "BC",
-          "naive_answer": "AC",
+          "confidence": 0.99,
+          "answer_prime": "A",
+          "naive_answer": "B",
           "valid_problem": true,
           "strategy_status": "INVALID"
         }
@@ -117,32 +117,32 @@
     {
       "id": 3,
       "source": "JEE Adv 2016 Paper 1",
-      "source_index": 43,
-      "type": "MCQ(multiple)",
-      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - MCQ(multiple)\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nLet $f:(0, \\infty) \\rightarrow \\mathbb{R}$ be a differentiable function such that $f^{\\prime}(x)=2-\\frac{f(x)}{x}$ for all $x \\in(0, \\infty)$ and $f(1) \\neq 1$. Then\n\n(A) $\\lim _{x \\rightarrow 0+} f^{\\prime}\\left(\\frac{1}{x}\\right)=1$\n\n(B) $\\lim _{x \\rightarrow 0+} x f\\left(\\frac{1}{x}\\right)=2$\n\n(C) $\\lim _{x \\rightarrow 0+} x^{2} f^{\\prime}(x)=0$\n\n(D) $|f(x)| \\leq 2$ for all $x \\in(0,2)$\n\n\n",
-      "original_gold": "A",
-      "perturbed_problem": "Let $f:(0, \\infty) \\rightarrow \\mathbb{R}$ be a function such that $f^{\\prime}(x)=2-\\frac{f(x)}{x}$ for all $x \\in(0, \\infty) \\setminus \\{1\\}$, and $f$ is not differentiable at $x=1$. Suppose $f(1) \\neq 1$. Then\n\n(A) $\\lim _{x \\rightarrow 0+} f^{\\prime}\\left(\\frac{1}{x}\\right)=1$\n\n(B) $\\lim _{x \\rightarrow 0+} x f\\left(\\frac{1}{x}\\right)=2$\n\n(C) $\\lim _{x \\rightarrow 0+} x^{2} f^{\\prime}(x)=0$\n\n(D) $|f(x)| \\leq 2$ for all $x \\in(0,2)$",
-      "answer_prime": "B",
-      "attempts_used": 3,
-      "original_strategy": "Solve the linear ODE $f'(x) = 2 - \\frac{f(x)}{x}$ via integrating factor to get general solution $f(x) = 2x + \\frac{c}{x}$, then apply $f(1) \\neq 1$ to rule out $c=0$, and evaluate limits accordingly.",
-      "changed_condition": "Removed differentiability at $x=1$, so the ODE does not hold at that point, and global classical solution is not guaranteed.",
-      "alternative_strategy": "Consider the ODE on $(0,1)$ and $(1,\\infty)$ separately. Solve each interval using integrating factor, yielding $f(x) = 2x + \\frac{c_1}{x}$ on $(0,1)$ and $f(x) = 2x + \\frac{c_2}{x}$ on $(1,\\infty)$, with $c_1 \\ne c_2$ possibly. Use $f(1) \\ne 1$ to constrain behavior, but no continuity or differentiability at 1 is assumed. Analyze limits involving $f(1/x)$ and $x^2 f'(x)$ carefully.",
+      "source_index": 40,
+      "type": "MCQ",
+      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - MCQ\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nA computer producing factory has only two plants $T_{1}$ and $T_{2}$. Plant $T_{1}$ produces $20 \\%$ and plant $T_{2}$ produces $80 \\%$ of the total computers produced. $7 \\%$ of computers produced in the factory turn out to be defective. It is known that\n\n$P$ (computer turns out to be defective given that it is produced in plant $T_{1}$ )\n\n$=10 P\\left(\\right.$ computer turns out to be defective given that it is produced in plant $\\left.T_{2}\\right)$,\n\nwhere $P(E)$ denotes the probability of an event $E$. A computer produced in the factory is randomly selected and it does not turn out to be defective. Then the probability that it is produced in plant $T_{2}$ is\n\n(A) $\\frac{36}{73}$\n\n(B) $\\frac{47}{79}$\n\n(C) $\\frac{78}{93}$\n\n(D) $\\frac{75}{83}$\n\n\n",
+      "original_gold": "C",
+      "perturbed_problem": "A computer producing factory has only two plants \\(T_1\\) and \\(T_2\\). Plant \\(T_1\\) produces \\(25\\%\\) and plant \\(T_2\\) produces \\(75\\%\\) of the total computers produced. \\(10\\%\\) of computers produced in the factory turn out to be defective. It is known that \\(P(\\text{computer does not turn out to be defective} \\mid \\text{produced in } T_1)=10P(\\text{computer turns out to be defective} \\mid \\text{produced in } T_2)\\), where \\(P(E)\\) denotes the probability of an event \\(E\\). A computer produced in the factory is randomly selected and it does not turn out to be defective. Then the probability that it is produced in plant \\(T_2\\) is\n\n(A) $\\frac{5}{21}$\n\n(B) $\\frac{21}{26}$\n\n(C) $\\frac{16}{21}$\n\n(D) $\\frac{5}{26}$",
+      "answer_prime": "C",
+      "attempts_used": 2,
+      "original_strategy": "Let \\(x=P(D\\mid T_2)\\), impose the original likelihood ratio \\(P(D\\mid T_1)=10x\\), solve the total-probability equation using the stated production shares and defect rate, then compute \\(P(T_2\\mid ND)\\) by Bayes' theorem.",
+      "changed_condition": "Replace the likelihood ratio between defective events by a mixed condition involving the non-defective event: \\(P(ND\\mid T_1)=10P(D\\mid T_2)\\), and change the production shares/overall defect rate so the original substitution is no longer valid.",
+      "alternative_strategy": "Let \\(x=P(D\\mid T_2)\\); use \\(P(ND\\mid T_1)=10x\\) to write \\(P(D\\mid T_1)=1-10x\\), solve \\(0.25(1-10x)+0.75x=0.10\\), and then use Bayes' theorem with \\(P(ND\\mid T_2)=1-x\\).",
       "validation": {
         "model_a": {
-          "confidence": 0.95,
-          "answer_prime": "B",
+          "confidence": 0.96,
+          "answer_prime": "C",
           "naive_answer": "B"
         },
         "model_b": {
-          "confidence": 0.95,
-          "answer_prime": "B",
+          "confidence": 1.0,
+          "answer_prime": "C",
           "naive_answer": "B",
           "valid_problem": true,
           "strategy_status": "INVALID"
         },
         "model_c": {
-          "confidence": 0.95,
-          "answer_prime": "B",
+          "confidence": 0.99,
+          "answer_prime": "C",
           "naive_answer": "B",
           "valid_problem": true,
           "strategy_status": "INVALID"
@@ -152,33 +152,33 @@
     {
       "id": 4,
       "source": "JEE Adv 2016 Paper 1",
-      "source_index": 46,
-      "type": "MCQ(multiple)",
-      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - MCQ(multiple)\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nA solution curve of the differential equation $\\left(x^{2}+x y+4 x+2 y+4\\right) \\frac{d y}{d x}-y^{2}=0, x>0$, passes through the point $(1,3)$. Then the solution curve\n\n(A) intersects $y=x+2$ exactly at one point\n\n(B) intersects $y=x+2$ exactly at two points\n\n(C) intersects $y=(x+2)^{2}$\n\n(D) does NO'T intersect $y=(x+3)^{2}$\n\n\n",
-      "original_gold": "AD",
-      "perturbed_problem": "A solution curve of the differential equation $\\left(x^{2}+x y+4 x+2 y+4\\right) \\frac{d y}{d x}-y^{2}=0$ passes through the point $(1,3)$. Then the solution curve\n\n(A) intersects $y=x+2$ exactly at one point\n\n(B) intersects $y=x+2$ exactly at two points\n\n(C) intersects $y=(x+2)^{2}$\n\n(D) does NOT intersect $y=(x+3)^{2}$",
-      "answer_prime": "AC",
-      "attempts_used": 3,
-      "original_strategy": "Use substitution $u = x + 2$ to simplify the coefficient, then separate variables and integrate.",
-      "changed_condition": "The domain restriction $x > 0$ is removed, allowing $x = -2$ and introducing a singularity where the coefficient vanishes.",
-      "alternative_strategy": "Use implicit analysis: factor the coefficient as $(x+2)(x+y+2)$, then analyze the direction field and existence of solutions through $(1,3)$, considering possible singularities and behavior near $x = -2$.",
+      "source_index": 41,
+      "type": "MCQ",
+      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - MCQ\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nThe least value of $\\alpha \\in \\mathbb{R}$ for which $4 \\alpha x^{2}+\\frac{1}{x} \\geq 1$, for all $x>0$, is\n\n(A) $\\frac{1}{64}$\n\n(B) $\\frac{1}{32}$\n\n(C) $\\frac{1}{27}$\n\n(D) $\\frac{1}{25}$\n\n\n",
+      "original_gold": "C",
+      "perturbed_problem": "The least value of \\(\\alpha \\in \\mathbb{R}\\) for which \\(4 \\alpha x^{2}+\\frac{1}{x} \\geq 1\\), for all \\(x \\geq 2\\), is\n\n(A) $\\(\\frac{1}{27}\\)$\n\n(B) $\\(\\frac{1}{16}\\)$\n\n(C) $\\(\\frac{1}{32}\\)$\n\n(D) $\\(\\frac{1}{64}\\)$",
+      "answer_prime": "C",
+      "attempts_used": 1,
+      "original_strategy": "Rewrite the inequality as \\( \\alpha \\ge \\frac{x-1}{4x^3}\\), maximize this function over \\(x>0\\) by setting its derivative to zero, and substitute the critical point \\(x=\\frac32\\).",
+      "changed_condition": "Replace the domain “for all \\(x>0\\)” with “for all \\(x \\ge 2\\)”, so the critical point \\(x=\\frac32\\) of the original maximization is no longer in the domain.",
+      "alternative_strategy": "Use monotonicity on the new domain: \\(f'(x)=\\frac{3-2x}{4x^4}<0\\) for \\(x\\ge2\\), so \\(f\\) is decreasing on \\([2,\\infty)\\) and its maximum is at the left endpoint \\(x=2\\).",
       "validation": {
         "model_a": {
           "confidence": 0.95,
-          "answer_prime": "D",
-          "naive_answer": "AD"
+          "answer_prime": "C",
+          "naive_answer": "A"
         },
         "model_b": {
-          "confidence": 0.95,
-          "answer_prime": "AC",
-          "naive_answer": null,
+          "confidence": 1.0,
+          "answer_prime": "C",
+          "naive_answer": "A",
           "valid_problem": true,
           "strategy_status": "INVALID"
         },
         "model_c": {
-          "confidence": 0.8,
-          "answer_prime": "AC",
-          "naive_answer": "AC",
+          "confidence": 0.99,
+          "answer_prime": "C",
+          "naive_answer": "A",
           "valid_problem": true,
           "strategy_status": "INVALID"
         }
@@ -187,32 +187,32 @@
     {
       "id": 5,
       "source": "JEE Adv 2016 Paper 1",
-      "source_index": 47,
+      "source_index": 43,
       "type": "MCQ(multiple)",
-      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - MCQ(multiple)\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nLet $f: \\mathbb{R} \\rightarrow \\mathbb{R}, \\quad g: \\mathbb{R} \\rightarrow \\mathbb{R}$ and $h: \\mathbb{R} \\rightarrow \\mathbb{R}$ be differentiable functions such that $f(x)=x^{3}+3 x+2, g(f(x))=x$ and $h(g(g(x)))=x$ for all $x \\in \\mathbb{R}$. Then\n\n(A) $\\quad g^{\\prime}(2)=\\frac{1}{15}$\n\n(B) $h^{\\prime}(1)=666$\n\n(C) $h(0)=16$\n\n(D) $h(g(3))=36$\n\n\n",
-      "original_gold": "BC",
-      "perturbed_problem": "Let $f: \\mathbb{R} \\rightarrow \\mathbb{R}, \\quad g: \\mathbb{R} \\rightarrow \\mathbb{R}$ and $h: \\mathbb{R} \\rightarrow \\mathbb{R}$ be functions such that $f(x)=x^{3}+3 x+2$, $g(f(x))=x$ for all $x \\in \\mathbb{R}$, and $h(g(g(x)))=x$ for all $x \\in \\mathbb{R}$. Suppose further that $g$ is not differentiable at $x = 2$. Then\n\n(A) $g^{\\prime}(2)=\\frac{1}{15}$\n\n(B) $h^{\\prime}(1)=666$\n\n(C) $h(0)=16$\n\n(D) $h(g(3))=36$",
-      "answer_prime": "C",
-      "attempts_used": 3,
-      "original_strategy": "Use the inverse function theorem: since $g(f(x)) = x$, $g$ is the inverse of $f$, so $g'(y) = 1/f'(x)$ where $y = f(x)$. Then use chain rule on $h(g(g(x))) = x$ to find $h'$ and $h$.",
-      "changed_condition": "Removed differentiability of $g$ at $x=2$, which invalidates the inverse function theorem application at that point.",
-      "alternative_strategy": "Since $g(f(x)) = x$, $g = f^{-1}$, so $f$ must be bijective. Use $f(x) = x^3 + 3x + 2$, which is strictly increasing (derivative $3x^2 + 3 > 0$), so $f^{-1}$ exists. Then $g(g(x)) = f^{-1}(f^{-1}(x))$, so $h = (g \\circ g)^{-1}$. Compute $h$ via composition and evaluate options directly using known values.",
+      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - MCQ(multiple)\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nLet $f:(0, \\infty) \\rightarrow \\mathbb{R}$ be a differentiable function such that $f^{\\prime}(x)=2-\\frac{f(x)}{x}$ for all $x \\in(0, \\infty)$ and $f(1) \\neq 1$. Then\n\n(A) $\\lim _{x \\rightarrow 0+} f^{\\prime}\\left(\\frac{1}{x}\\right)=1$\n\n(B) $\\lim _{x \\rightarrow 0+} x f\\left(\\frac{1}{x}\\right)=2$\n\n(C) $\\lim _{x \\rightarrow 0+} x^{2} f^{\\prime}(x)=0$\n\n(D) $|f(x)| \\leq 2$ for all $x \\in(0,2)$\n\n\n",
+      "original_gold": "A",
+      "perturbed_problem": "Let \\(f:(0,\\infty)\\to\\mathbb{R}\\) be a differentiable function such that \\(f'(x)=2-\\left(\\frac{f(x)}{x}\\right)^2\\) for all \\(x\\in(0,\\infty)\\) and \\(f(1)=\\frac12\\). Then which of the following is/are correct?\n\n(A) $\\(\\lim_{x\\to 0+} x^2 f'(x)=\\frac12\\)$\n\n(B) $\\(\\lim_{x\\to 0+} f'\\left(\\frac1x\\right)=3\\)$\n\n(C) $\\(\\lim_{x\\to 0+} x f\\left(\\frac1x\\right)=0\\)$\n\n(D) $\\(\\lim_{x\\to 0+} \\frac{f(x)}{x}=-2\\)$",
+      "answer_prime": "D",
+      "attempts_used": 1,
+      "original_strategy": "Solve the linear ODE by writing \\((xf)'=2x\\), giving \\(f=x+\\frac{C}{x}\\), then use \\(f(1)=\\frac12\\) to get \\(C=-\\frac12\\) and test each limit.",
+      "changed_condition": "Changed the ODE to the nonlinear homogeneous equation \\(f'=2-(f/x)^2\\) and fixed \\(f(1)=\\frac12\\), so the linear formula \\(f=x+\\frac{C}{x}\\) no longer applies.",
+      "alternative_strategy": "Use \\(v=f/x\\) to get the separable equation \\(xv'=(1-v)(v+2)\\), solve with \\(f(1)=\\frac12\\), and evaluate limits from \\(v=\\frac{5x^3-2}{5x^3+1}\\).",
       "validation": {
         "model_a": {
           "confidence": 0.95,
-          "answer_prime": "BC",
-          "naive_answer": "BC"
+          "answer_prime": "D",
+          "naive_answer": "A"
         },
         "model_b": {
           "confidence": 0.95,
-          "answer_prime": "C",
-          "naive_answer": null,
+          "answer_prime": "D",
+          "naive_answer": "A",
           "valid_problem": true,
           "strategy_status": "INVALID"
         },
         "model_c": {
-          "confidence": 0.95,
-          "answer_prime": "C",
+          "confidence": 0.97,
+          "answer_prime": "D",
           "naive_answer": "A",
           "valid_problem": true,
           "strategy_status": "INVALID"
@@ -222,33 +222,33 @@
     {
       "id": 6,
       "source": "JEE Adv 2016 Paper 1",
-      "source_index": 49,
+      "source_index": 45,
       "type": "MCQ(multiple)",
-      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - MCQ(multiple)\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nLet $R S$ be the diameter of the circle $x^{2}+y^{2}=1$, where $S$ is the point $(1,0)$. Let $P$ be a variable point (other than $R$ and $S$ ) on the circle and tangents to the circle at $S$ and $P$ meet at the point $Q$. The normal to the circle at $P$ intersects a line drawn through $Q$ parallel to $R S$ at point $E$. Then the locus of $E$ passes through the point(s)\n\n(A) $\\left(\\frac{1}{3}, \\frac{1}{\\sqrt{3}}\\right)$\n\n(B) $\\left(\\frac{1}{4}, \\frac{1}{2}\\right)$\n\n(C) $\\left(\\frac{1}{3},-\\frac{1}{\\sqrt{3}}\\right)$\n\n(D) $\\left(\\frac{1}{4},-\\frac{1}{2}\\right)$\n\n\n",
-      "original_gold": "AC",
-      "perturbed_problem": "Let $RS$ be the diameter of the ellipse $x^{2} + 4y^{2} = 1$, where $S$ is the point $(1,0)$. Let $P$ be a variable point (other than $R$ and $S$) on the ellipse and tangents to the ellipse at $S$ and $P$ meet at the point $Q$. The normal to the ellipse at $P$ intersects a line drawn through $Q$ parallel to $RS$ at point $E$. Then the locus of $E$ passes through the point(s)\n\n(A) $(\\frac{1}{3}, \\frac{1}{\\sqrt{3}})$\n\n(B) $(\\frac{1}{4}, \\frac{1}{2})$\n\n(C) $(\\frac{1}{3}, -\\frac{1}{\\sqrt{3}})$\n\n(D) $(\\frac{1}{4}, -\\frac{1}{2})$",
-      "answer_prime": "AC",
-      "attempts_used": 2,
-      "original_strategy": "Parametrize the point $P$ on the unit circle as $(\\cos\\theta, \\sin\\theta)$, use circle-specific tangent and normal formulas, and derive the locus via trigonometric identities.",
-      "changed_condition": "The circle $x^2 + y^2 = 1$ is replaced by the ellipse $x^2 + 4y^2 = 1$, which invalidates the standard parametrization $(\\cos\\theta, \\sin\\theta)$ and the geometric properties (e.g., tangent and normal equations) used in the original solution.",
-      "alternative_strategy": "Use parametric equations for the ellipse: $x = \\cos\\theta$, $y = \\frac{1}{2}\\sin\\theta$. Compute tangent and normal vectors using derivatives. Find $Q$ as intersection of tangents at $S$ and $P$. Then find the intersection of the normal at $P$ with the line through $Q$ parallel to $RS$ (x-axis). Eliminate $\\theta$ to find the locus and test the points.",
+      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - MCQ(multiple)\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nIn a triangle $X Y Z$, let $x, y, z$ be the lengths of sides opposite to the angles $X, Y, Z$, respectively, and $2 s=x+y+z$. If $\\frac{s-x}{4}=\\frac{s-y}{3}=\\frac{s-z}{2}$ and area of incircle of the triangle $X Y Z$ is $\\frac{8 \\pi}{3}$, then\n\n(A) area of the triangle $X Y Z$ is $6 \\sqrt{6}$\n\n(B) the radius of circumcircle of the triangle $X Y Z$ is $\\frac{35}{6} \\sqrt{6}$\n\n(C) $\\sin \\frac{X}{2} \\sin \\frac{Y}{2} \\sin \\frac{Z}{2}=\\frac{4}{35}$\n\n(D) $\\sin ^{2}\\left(\\frac{X+Y}{2}\\right)=\\frac{3}{5}$\n\n\n",
+      "original_gold": "ACD",
+      "perturbed_problem": "In a triangle \\(XYZ\\), let \\(x, y, z\\) be the lengths of sides opposite to the angles \\(X, Y, Z\\), respectively, and \\(2s=x+y+z\\). If \\(\\frac{s-x}{4}=\\frac{s-y}{3}=\\frac{s-z}{2}\\) and the area of the excircle opposite \\(X\\) is \\(\\frac{8\\pi}{3}\\), then\n\n(A) $the area of the triangle \\(XYZ\\) is \\(6\\sqrt{6}\\)$\n\n(B) $the radius of the circumcircle of the triangle \\(XYZ\\) is \\(\\frac{35\\sqrt{6}}{24}\\)$\n\n(C) $the area of the triangle \\(XYZ\\) is \\(\\frac{32\\sqrt{6}}{27}\\)$\n\n(D) $the radius of the circumcircle of the triangle \\(XYZ\\) is \\(\\frac{35\\sqrt{6}}{54}\\)$",
+      "answer_prime": "CD",
+      "attempts_used": 1,
+      "original_strategy": "The standard solution sets \\((s-x)/4=(s-y)/3=(s-z)/2=k\\), obtains \\(x:y:z=5:6:7\\) and \\(s=9k\\), uses Heron’s formula and the incircle radius \\(r=\\Delta/s\\) to find \\(k=1\\), then computes \\(\\Delta\\), \\(R\\), and the half-angle identities.",
+      "changed_condition": "Replace the area of the incircle by the area of the excircle opposite \\(X\\), so the relevant radius formula changes from \\(r=\\Delta/s\\) to \\(r_x=\\Delta/(s-x)\\).",
+      "alternative_strategy": "Use the exradius formula \\(r_x=\\Delta/(s-x)\\) to determine the scale factor, then compute the area and circumradius from the same side ratio \\(5:6:7\\).",
       "validation": {
         "model_a": {
           "confidence": 0.95,
-          "answer_prime": "AC",
-          "naive_answer": "AC"
+          "answer_prime": "CD",
+          "naive_answer": "AB"
         },
         "model_b": {
-          "confidence": 0.85,
-          "answer_prime": "AC",
-          "naive_answer": null,
+          "confidence": 1.0,
+          "answer_prime": "CD",
+          "naive_answer": "AB",
           "valid_problem": true,
           "strategy_status": "INVALID"
         },
         "model_c": {
-          "confidence": 0.9,
-          "answer_prime": "AC",
-          "naive_answer": "AC",
+          "confidence": 0.97,
+          "answer_prime": "CD",
+          "naive_answer": "AB",
           "valid_problem": true,
           "strategy_status": "INVALID"
         }
@@ -257,33 +257,33 @@
     {
       "id": 7,
       "source": "JEE Adv 2016 Paper 1",
-      "source_index": 50,
-      "type": "Integer",
-      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - Integer\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nWhat is the total number of distinct $x \\in \\mathbb{R}$ for which $\\left|\\begin{array}{ccc}x & x^{2} & 1+x^{3} \\\\ 2 x & 4 x^{2} & 1+8 x^{3} \\\\ 3 x & 9 x^{2} & 1+27 x^{3}\\end{array}\\right|=10$?\n\n\n",
-      "original_gold": "2",
-      "perturbed_problem": "What is the total number of distinct $x \\in \\mathbb{R}$ for which $\\left|\\begin{array}{ccc}x & x^{2} & 1+x^{3} \\\\ 2x & 4x^{2} & 1+8x^{3} \\\\ 3x & 9x^{2} & 1+27x^{3}\\end{array}\\right| = 10x$?\n\n(A) 0\n\n(B) 1\n\n(C) 2\n\n(D) 3",
-      "answer_prime": "C",
+      "source_index": 47,
+      "type": "MCQ(multiple)",
+      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - MCQ(multiple)\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nLet $f: \\mathbb{R} \\rightarrow \\mathbb{R}, \\quad g: \\mathbb{R} \\rightarrow \\mathbb{R}$ and $h: \\mathbb{R} \\rightarrow \\mathbb{R}$ be differentiable functions such that $f(x)=x^{3}+3 x+2, g(f(x))=x$ and $h(g(g(x)))=x$ for all $x \\in \\mathbb{R}$. Then\n\n(A) $\\quad g^{\\prime}(2)=\\frac{1}{15}$\n\n(B) $h^{\\prime}(1)=666$\n\n(C) $h(0)=16$\n\n(D) $h(g(3))=36$\n\n\n",
+      "original_gold": "BC",
+      "perturbed_problem": "Let \\(f: \\mathbb{R} \\rightarrow \\mathbb{R}, g: \\mathbb{R} \\rightarrow \\mathbb{R}, h: \\mathbb{R} \\rightarrow \\mathbb{R}\\) be differentiable functions such that \\(f(x)=x^{3}+3x+2\\), \\(g(f(x))=x\\), and \\(h(g(g(x)))=x^{2}\\) for all \\(x \\in \\mathbb{R}\\). Then\n\n(A) $\\(h(0)=16\\)$\n\n(B) $\\(h(0)=256\\)$\n\n(C) $\\(h'(1)=314352\\)$\n\n(D) $\\(h(g(3))=38\\)$",
+      "answer_prime": "BC",
       "attempts_used": 1,
-      "original_strategy": "Factor out $x$ from each row and simplify the determinant using linearity and row operations, then analyze the resulting polynomial equation by factoring or substitution.",
-      "changed_condition": "The right-hand side is now $10x$ instead of $10$, breaking the constant term and removing the symmetry that allowed factoring out $x$ cleanly.",
-      "alternative_strategy": "Split into cases: $x = 0$ and $x \\ne 0$. For $x \\ne 0$, factor $x$ from each row, simplify determinant, solve the resulting cubic. Check $x=0$ separately. Use sign analysis and intermediate value theorem to count real roots.",
+      "original_strategy": "Use \\(f\\) bijective to get \\(g=f^{-1}\\); then invert \\(t=g(g(x))\\) to obtain \\(h(t)=f(f(t))\\), so \\(h=f\\circ f\\), and evaluate \\(f\\circ f\\) and its derivative.",
+      "changed_condition": "Replace the defining condition \\(h(g(g(x)))=x\\) by \\(h(g(g(x)))=x^2\\), so \\(h\\) is no longer \\(f\\circ f\\) but \\((f\\circ f)^2\\).",
+      "alternative_strategy": "Set \\(t=g(g(x))\\); since \\(g=f^{-1}\\), applying \\(f\\) twice gives \\(x=f(f(t))\\), hence \\(h(t)=x^2=(f(f(t)))^2\\). Differentiate this composite square using the chain rule and evaluate the requested points.",
       "validation": {
         "model_a": {
-          "confidence": 0.95,
+          "confidence": 0.96,
           "answer_prime": "BC",
-          "naive_answer": "C"
+          "naive_answer": "AD"
         },
         "model_b": {
-          "confidence": 1.0,
-          "answer_prime": "C",
-          "naive_answer": "C",
+          "confidence": 0.99,
+          "answer_prime": "BC",
+          "naive_answer": "AD",
           "valid_problem": true,
           "strategy_status": "INVALID"
         },
         "model_c": {
-          "confidence": 0.95,
-          "answer_prime": "C",
-          "naive_answer": "C",
+          "confidence": 0.99,
+          "answer_prime": "BC",
+          "naive_answer": "A",
           "valid_problem": true,
           "strategy_status": "INVALID"
         }
@@ -292,33 +292,33 @@
     {
       "id": 8,
       "source": "JEE Adv 2016 Paper 1",
-      "source_index": 51,
-      "type": "Integer",
-      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - Integer\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nLet $m$ be the smallest positive integer such that the coefficient of $x^{2}$ in the expansion of $(1+x)^{2}+(1+x)^{3}+\\cdots+(1+x)^{49}+(1+m x)^{50}$ is $(3 n+1){ }^{51} C_{3}$ for some positive integer $n$. Then what is the value of $n$?\n\n\n",
-      "original_gold": "5",
-      "perturbed_problem": "Let $m$ be the smallest positive integer such that the coefficient of $x^{2}$ in the expansion of $(1+x)^{2}+(1+x)^{3}+\\cdots+(1+x)^{49}+(1+m x)^{50}$ is $(3n+1)\\binom{51}{3}$ for some positive integer $n$. If $m$ is instead required to be a negative integer, what is the value of $n$?\n\n(A) 4\n\n(B) 5\n\n(C) 6\n\n(D) 7",
-      "answer_prime": "B",
-      "attempts_used": 2,
-      "original_strategy": "Use the standard formula for the coefficient of $x^2$ in $(1+x)^k$, sum over $k=2$ to $49$, add the contribution from $(1+mx)^{50}$, and solve for $m$ such that the total matches $(3n+1)\\binom{51}{3}$.",
-      "changed_condition": "Replaces the requirement that $m$ is a positive integer with $m$ being a negative integer.",
-      "alternative_strategy": "Expand $(1+mx)^{50}$ using binomial theorem, compute the $x^2$ coefficient as $\\binom{50}{2}m^2$, sum over $k=2$ to $49$ using $\\binom{k}{2}$, then solve the resulting equation for $n$ given $m$ negative but minimal in magnitude.",
+      "source_index": 48,
+      "type": "MCQ(multiple)",
+      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - MCQ(multiple)\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nThe circle $C_{1}: x^{2}+y^{2}=3$, with centre at $O$, intersects the parabola $x^{2}=2 y$ at the point $P$ in the first quadrant. Let the tangent to the circle $C_{1}$ at $P$ touches other two circles $C_{2}$ and $C_{3}$ at $R_{2}$ and $R_{3}$, respectively. Suppose $C_{2}$ and $C_{3}$ have equal radii $2 \\sqrt{3}$ and centres $Q_{2}$ and $Q_{3}$, respectively. If $Q_{2}$ and $Q_{3}$ lie on the $y$-axis, then\n\n(A) $Q_{2} Q_{3}=12$\n\n(B) $\\quad R_{2} R_{3}=4 \\sqrt{6}$\n\n(C) area of the triangle $O R_{2} R_{3}$ is $6 \\sqrt{2}$\n\n(D) area of the triangle $P Q_{2} Q_{3}$ is $4 \\sqrt{2}$\n\n\n",
+      "original_gold": "ABC",
+      "perturbed_problem": "The circle \\(C_{1}: x^{2}+y^{2}=3\\), with centre at \\(O\\), intersects the parabola \\(x^{2}=2y\\) at the point \\(P\\) in the first quadrant. Let the tangent to \\(C_{1}\\) at \\(P\\) touch two circles \\(C_{2}\\) and \\(C_{3}\\) at \\(R_{2}\\) and \\(R_{3}\\), respectively. Suppose \\(C_{2}\\) and \\(C_{3}\\) have equal radii \\(2\\sqrt{3}\\) and their centres \\(Q_{2}\\) and \\(Q_{3}\\) lie on the line \\(y=1\\). Then\n\n(A) $\\(Q_{2}Q_{3}=6\\sqrt{2}\\)$\n\n(B) $\\(Q_{2}Q_{3}=12\\)$\n\n(C) $\\(R_{2}R_{3}=2\\sqrt{6}\\)$\n\n(D) $\\(R_{2}R_{3}=4\\sqrt{6}\\)$",
+      "answer_prime": "AC",
+      "attempts_used": 1,
+      "original_strategy": "Use the first-quadrant intersection to get \\(P=(\\sqrt2,1)\\) and the tangent \\(\\sqrt2x+y=3\\); put the centres on the \\(y\\)-axis as \\((0,k)\\), solve \\(\\frac{|k-3|}{\\sqrt3}=2\\sqrt3\\), then compute tangent points by the foot-of-perpendicular formula.",
+      "changed_condition": "The centres are no longer on the \\(y\\)-axis; they are placed on the horizontal line \\(y=1\\), so the parametrization \\((0,k)\\) is invalid.",
+      "alternative_strategy": "Parametrize a centre as \\(Q=(h,1)\\), impose that its distance from the tangent line equals \\(2\\sqrt3\\), solve for \\(h\\), then use the perpendicular foot formula to locate \\(R_2,R_3\\) and compute the distances.",
       "validation": {
         "model_a": {
-          "confidence": 0.85,
-          "answer_prime": "B",
-          "naive_answer": "B"
+          "confidence": 0.95,
+          "answer_prime": "AC",
+          "naive_answer": "BD"
         },
         "model_b": {
           "confidence": 1.0,
-          "answer_prime": "B",
-          "naive_answer": null,
+          "answer_prime": "AC",
+          "naive_answer": "BD",
           "valid_problem": true,
           "strategy_status": "INVALID"
         },
         "model_c": {
-          "confidence": 0.95,
-          "answer_prime": "B",
-          "naive_answer": "B",
+          "confidence": 0.99,
+          "answer_prime": "AC",
+          "naive_answer": "BD",
           "valid_problem": true,
           "strategy_status": "INVALID"
         }
@@ -327,33 +327,33 @@
     {
       "id": 9,
       "source": "JEE Adv 2016 Paper 1",
-      "source_index": 53,
-      "type": "Integer",
-      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - Integer\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nLet $\\alpha, \\beta \\in \\mathbb{R}$ be such that $\\lim _{x \\rightarrow 0} \\frac{x^{2} \\sin (\\beta x)}{\\alpha x-\\sin x}=1$.Then what is the value of $6(\\alpha+\\beta)$?\n\n\n",
-      "original_gold": "7",
-      "perturbed_problem": "Let $\\alpha, \\beta \\in \\mathbb{R}$ be such that $\\lim _{x \\rightarrow 0} \\frac{x^{2} \\sin (\\beta x)}{\\alpha x-\\sin x}=1$. Then what is the value of $6(\\alpha+\\beta)$, given that $\\alpha = 1$?\n\n(A) 5\n\n(B) 6\n\n(C) 7\n\n(D) 8",
-      "answer_prime": "C",
-      "attempts_used": 1,
-      "original_strategy": "Expand numerator and denominator using Taylor series around $x=0$, match leading terms to satisfy the limit condition.",
-      "changed_condition": "Added the condition $\\alpha = 1$, which fixes one parameter and breaks the symmetry in the limit equation, making the standard asymptotic matching incomplete without solving for $\\beta$ explicitly.",
-      "alternative_strategy": "Substitute $\\alpha = 1$, expand $\\sin(\\beta x)$ and $\\sin x$ in Taylor series, compute the limit, and solve for $\\beta$ by matching coefficients of $x^3$.",
+      "source_index": 49,
+      "type": "MCQ(multiple)",
+      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - MCQ(multiple)\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nLet $R S$ be the diameter of the circle $x^{2}+y^{2}=1$, where $S$ is the point $(1,0)$. Let $P$ be a variable point (other than $R$ and $S$ ) on the circle and tangents to the circle at $S$ and $P$ meet at the point $Q$. The normal to the circle at $P$ intersects a line drawn through $Q$ parallel to $R S$ at point $E$. Then the locus of $E$ passes through the point(s)\n\n(A) $\\left(\\frac{1}{3}, \\frac{1}{\\sqrt{3}}\\right)$\n\n(B) $\\left(\\frac{1}{4}, \\frac{1}{2}\\right)$\n\n(C) $\\left(\\frac{1}{3},-\\frac{1}{\\sqrt{3}}\\right)$\n\n(D) $\\left(\\frac{1}{4},-\\frac{1}{2}\\right)$\n\n\n",
+      "original_gold": "AC",
+      "perturbed_problem": "Let \\(R S\\) be the diameter of the circle \\(x^{2}+y^{2}=1\\), where \\(S\\) is the point \\((1,0)\\). Let \\(P\\) be a variable point (other than \\(R\\) and \\(S\\)) on the circle lying in the first quadrant (\\(x>0,\\ y>0\\)), and tangents to the circle at \\(S\\) and \\(P\\) meet at the point \\(Q\\). The normal to the circle at \\(P\\) intersects a line drawn through \\(Q\\) parallel to \\(R S\\) at point \\(E\\). Then the locus of \\(E\\) passes through the point(s)\n\n(A) $\\(\\left(\\frac{3}{8},-\\frac{1}{2}\\right)\\)$\n\n(B) $\\(\\left(\\frac{3}{8},\\frac{1}{2}\\right)\\)$\n\n(C) $\\(\\left(\\frac{1}{3},\\frac{2}{3}\\right)\\)$\n\n(D) $\\((0,1)\\)$",
+      "answer_prime": "B",
+      "attempts_used": 2,
+      "original_strategy": "Parameterize \\(P=(\\cos\\theta,\\sin\\theta)\\) over the whole circle, find \\(Q=(1,\\tan(\\theta/2))\\), then use the horizontal line through \\(Q\\) and the radial normal \\(y=x\\tan\\theta\\) to obtain the full parabola \\(x=(1-y^2)/2\\).",
+      "changed_condition": "The domain of \\(P\\) is restricted to the open first quadrant \\(0<\\theta<\\pi/2\\), so the locus is only the upper segment of the parabola with \\(0<y<1\\), breaking the x-axis symmetry.",
+      "alternative_strategy": "Set \\(t=\\tan(\\theta/2)\\) with \\(0<t<1\\); compute \\(E=((1-t^2)/2,t)\\), so test the relation \\(x=(1-y^2)/2\\) together with \\(0<y<1\\).",
       "validation": {
         "model_a": {
-          "confidence": 0.95,
-          "answer_prime": "C",
-          "naive_answer": "C"
+          "confidence": 0.92,
+          "answer_prime": "B",
+          "naive_answer": "ABD"
         },
         "model_b": {
           "confidence": 1.0,
-          "answer_prime": "C",
-          "naive_answer": null,
+          "answer_prime": "B",
+          "naive_answer": "ABD",
           "valid_problem": true,
-          "strategy_status": "INVALID"
+          "strategy_status": "INSUFFICIENT"
         },
         "model_c": {
-          "confidence": 1.0,
-          "answer_prime": "C",
-          "naive_answer": "C",
+          "confidence": 0.98,
+          "answer_prime": "B",
+          "naive_answer": "ABD",
           "valid_problem": true,
           "strategy_status": "INVALID"
         }
@@ -362,33 +362,33 @@
     {
       "id": 10,
       "source": "JEE Adv 2016 Paper 1",
-      "source_index": 54,
+      "source_index": 50,
       "type": "Integer",
-      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - Integer\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nLet $z=\\frac{-1+\\sqrt{3} i}{2}$, where $i=\\sqrt{-1}$, and $r, s \\in\\{1,2,3\\}$. Let $P=\\left[\\begin{array}{cc}(-z)^{r} & z^{2 s} \\\\ z^{2 s} & z^{r}\\end{array}\\right]$ and $I$ be the identity matrix of order 2 . Then what is the total number of ordered pairs $(r, s)$ for which $P^{2}=-I$?\n\n\n",
-      "original_gold": "1",
-      "perturbed_problem": "Let $z=\\frac{-1+\\sqrt{3} i}{2}$, where $i=\\sqrt{-1}$, and $r, s \\in\\{1,2,3\\}$. Let $P=\\left[\\begin{array}{cc}(-z)^{r} & z^{2 s} \\\\ z^{2 s} & z^{r}\\end{array}\\right]$ and $I$ be the identity matrix of order 2. Then what is the total number of ordered pairs $(r, s)$ for which $P^{2} = I$?\n\n(A) 0\n\n(B) 1\n\n(C) 2\n\n(D) 3",
-      "answer_prime": "A",
-      "attempts_used": 2,
-      "original_strategy": "Compute $P^2$ directly using matrix multiplication and equate it to $-I$, using the fact that $z$ is a primitive cube root of unity, so $z^3 = 1$ and $1 + z + z^2 = 0$.",
-      "changed_condition": "Changed the target from $P^2 = -I$ to $P^2 = I$.",
-      "alternative_strategy": "Use the fact that $z$ is a primitive cube root of unity, so $z^3 = 1$, and compute $P^2$ explicitly for each $(r,s)$ pair in $\\{1,2,3\\}^2$, simplifying using $z^3 = 1$, $z^2 = \\bar{z}$, and $1 + z + z^2 = 0$. Check when $P^2 = I$.",
+      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - Integer\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nWhat is the total number of distinct $x \\in \\mathbb{R}$ for which $\\left|\\begin{array}{ccc}x & x^{2} & 1+x^{3} \\\\ 2 x & 4 x^{2} & 1+8 x^{3} \\\\ 3 x & 9 x^{2} & 1+27 x^{3}\\end{array}\\right|=10$?\n\n\n",
+      "original_gold": "2",
+      "perturbed_problem": "What is the total number of distinct \\(x \\in (0,\\infty)\\) for which \\(\\begin{vmatrix} x & x^2 & 1+x^3 \\\\ 2x & 4x^2 & 1+8x^3 \\\\ 3x & 9x^2 & 1+27x^3 \\end{vmatrix}=10\\)?\n\n(A) 0\n\n(B) 1\n\n(C) 2\n\n(D) 3",
+      "answer_prime": "B",
+      "attempts_used": 1,
+      "original_strategy": "Factor \\(x\\) and \\(x^2\\) from the first two columns, split the third column, and obtain \\(D=2x^3(1+6x^3)\\). Then set \\(y=x^3\\), solve \\(6y^2+y-5=0\\), and count two real \\(x\\) because cubing is a bijection on \\(\\mathbb{R}\\).",
+      "changed_condition": "The domain is changed from all real \\(x\\) to only positive \\(x\\in(0,\\infty)\\), so the negative root \\(y=-1\\) is no longer admissible.",
+      "alternative_strategy": "First impose \\(y=x^3>0\\), then solve \\(6y^2+y-5=0\\). Keep only the positive root \\(y=5/6\\), and take its unique positive cube root, giving exactly one solution.",
       "validation": {
         "model_a": {
-          "confidence": 0.95,
-          "answer_prime": "A",
-          "naive_answer": "B"
+          "confidence": 0.97,
+          "answer_prime": "B",
+          "naive_answer": "C"
         },
         "model_b": {
           "confidence": 1.0,
-          "answer_prime": "A",
-          "naive_answer": "A",
+          "answer_prime": "B",
+          "naive_answer": "C",
           "valid_problem": true,
-          "strategy_status": "STILL_VALID"
+          "strategy_status": "INVALID"
         },
         "model_c": {
-          "confidence": 0.95,
-          "answer_prime": "A",
-          "naive_answer": null,
+          "confidence": 0.99,
+          "answer_prime": "B",
+          "naive_answer": "C",
           "valid_problem": true,
           "strategy_status": "INVALID"
         }
@@ -396,33 +396,33 @@
     },
     {
       "id": 11,
-      "source": "JEE Adv 2016 Paper 2",
-      "source_index": 37,
-      "type": "MCQ",
-      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - MCQ\n### Source: JEE Adv 2016 Paper 2\n\n### Question:\nLet $P=\\left[\\begin{array}{ccc}1 & 0 & 0 \\\\ 4 & 1 & 0 \\\\ 16 & 4 & 1\\end{array}\\right]$ and $I$ be the identity matrix of order 3. If $Q=\\left[q_{i j}\\right]$ is a matrix such that $P^{50}-Q=I$, then $\\frac{q_{31}+q_{32}}{q_{21}}$ equals\n\n(A) 52\n\n(B) 103\n\n(C) 201\n\n(D) 205\n\n\n",
-      "original_gold": "B",
-      "perturbed_problem": "Let $P=\\left[\\begin{array}{ccc}1 & 0 & 0 \\\\ 4 & 1 & 0 \\\\ 16 & 4 & 1\\end{array}\\right]$ and $I$ be the identity matrix of order 3. If $Q=\\left[q_{i j}\\right]$ is a matrix such that $P^{50} - Q = 2I$, then $\\frac{q_{31} + q_{32}}{q_{21}}$ equals\n\n(A) 52\n\n(B) 103\n\n(C) 201\n\n(D) 205",
-      "answer_prime": "B",
-      "attempts_used": 1,
-      "original_strategy": "Use the fact that $P = I + N$, where $N$ is strictly upper triangular, so $P^n = I + nN + \\binom{n}{2}N^2 + \\cdots$, and compute entries of $P^{50}$ using nilpotency of $N$.",
-      "changed_condition": "Change the equation from $P^{50} - Q = I$ to $P^{50} - Q = 2I$, so $Q = P^{50} - 2I$.",
-      "alternative_strategy": "Compute $P^{50}$ explicitly using matrix powers via nilpotent structure, then subtract $2I$ to get $Q$, and compute the required ratio directly using the entries.",
+      "source": "JEE Adv 2016 Paper 1",
+      "source_index": 51,
+      "type": "Integer",
+      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - Integer\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nLet $m$ be the smallest positive integer such that the coefficient of $x^{2}$ in the expansion of $(1+x)^{2}+(1+x)^{3}+\\cdots+(1+x)^{49}+(1+m x)^{50}$ is $(3 n+1){ }^{51} C_{3}$ for some positive integer $n$. Then what is the value of $n$?\n\n\n",
+      "original_gold": "5",
+      "perturbed_problem": "Let \\(m\\) be the smallest positive integer such that the coefficient of \\(x^{2}\\) in the expansion of \\((1+x)^{2}+(1+x)^{3}+\\cdots+(1+x)^{49}+(1+m x^{2})^{50}\\) is \\((3n+1)\\binom{51}{3}\\) for some positive integer \\(n\\). Then what is the value of \\(n\\)?\n\n(A) 1\n\n(B) 5\n\n(C) 51\n\n(D) 17",
+      "answer_prime": "A",
+      "attempts_used": 2,
+      "original_strategy": "Use the hockey-stick identity to sum \\(\\binom{k}{2}\\) from \\(k=2\\) to \\(49\\) as \\(\\binom{50}{3}\\), and take the \\(x^2\\) coefficient of \\((1+mx)^{50}\\) as \\(\\binom{50}{2}m^2\\), yielding \\(m^2=51n+1\\) and hence \\(n=5\\).",
+      "changed_condition": "The last term is changed from \\((1+mx)^{50}\\) to \\((1+m x^2)^{50}\\), so the \\(x^2\\) contribution becomes linear in \\(m\\) instead of quadratic.",
+      "alternative_strategy": "Compute the \\(x^2\\) coefficient directly as \\(\\binom{50}{3}+50m=(3n+1)\\binom{51}{3}\\), which reduces to \\(2m=2499n+49\\). Parity forces \\(n\\) odd, and the smallest \\(m\\) occurs at \\(n=1\\).",
       "validation": {
         "model_a": {
           "confidence": 0.95,
-          "answer_prime": "B",
+          "answer_prime": "A",
           "naive_answer": "B"
         },
         "model_b": {
           "confidence": 1.0,
-          "answer_prime": "B",
+          "answer_prime": "A",
           "naive_answer": "B",
           "valid_problem": true,
-          "strategy_status": "STILL_VALID"
+          "strategy_status": "INVALID"
         },
         "model_c": {
-          "confidence": 1.0,
-          "answer_prime": "B",
+          "confidence": 0.99,
+          "answer_prime": "A",
           "naive_answer": "B",
           "valid_problem": true,
           "strategy_status": "INVALID"
@@ -431,34 +431,139 @@
     },
     {
       "id": 12,
-      "source": "JEE Adv 2016 Paper 2",
-      "source_index": 38,
-      "type": "MCQ",
-      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - MCQ\n### Source: JEE Adv 2016 Paper 2\n\n### Question:\nLet $b_{i}>1$ for $i=1,2, \\ldots, 101$. Suppose $\\log _{e} b_{1}, \\log _{e} b_{2}, \\ldots, \\log _{e} b_{101}$ are in Arithmetic Progression (A.P.) with the common difference $\\log _{e} 2$. Suppose $a_{1}, a_{2}, \\ldots, a_{101}$ are in A.P. such that $a_{1}=b_{1}$ and $a_{51}=b_{51}$. If $t=b_{1}+b_{2}+\\cdots+b_{51}$ and $s=a_{1}+a_{2}+\\cdots+a_{51}$, then\n\n(A) $s>t$ and $a_{101}>b_{101}$\n\n(B) $s>t$ and $a_{101}<b_{101}$\n\n(C) $s<t$ and $a_{101}>b_{101}$\n\n(D) $s<t$ and $a_{101}<b_{101}$\n\n\n",
-      "original_gold": "B",
-      "perturbed_problem": "Let $b_{i}>1$ for $i=1,2, \\ldots, 101$. Suppose $\\log _{e} b_{1}, \\log _{e} b_{2}, \\ldots, \\log _{e} b_{101}$ are in Arithmetic Progression (A.P.) with the common difference $\\log _{e} 2$. Suppose $a_{1}, a_{2}, \\ldots, a_{101}$ are in A.P. such that $a_{1}=b_{1}$ and $a_{51}=b_{50}$. If $t=b_{1}+b_{2}+\\cdots+b_{51}$ and $s=a_{1}+a_{2}+\\cdots+a_{51}$, then\n\n(A) s>t and $a_{101}>b_{101}$\n\n(B) s>t and $a_{101}<b_{101}$\n\n(C) s<t and $a_{101}>b_{101}$\n\n(D) s<t and $a_{101}<b_{101}$",
+      "source": "JEE Adv 2016 Paper 1",
+      "source_index": 52,
+      "type": "Integer",
+      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - Integer\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nWhat is the total number of distinct $x \\in[0,1]$ for which $\\int_{0}^{x} \\frac{t^{2}}{1+t^{4}} d t=2 x-1$?\n\n\n",
+      "original_gold": "1",
+      "perturbed_problem": "What is the total number of distinct \\(x \\in [0,1]\\) for which \\(\\int_{0}^{x} \\frac{t^{2}}{1+t^{4}} dt = |2x-1|\\)?\n\n(A) 1\n\n(B) 2\n\n(C) 3\n\n(D) 0",
       "answer_prime": "B",
-      "attempts_used": 3,
-      "original_strategy": "The original strategy uses $a_{51} = b_{51}$ to compute the common difference of the $a_i$ sequence directly, then compares the sums $s$ and $t$ using the convexity of the exponential function and midpoint alignment.",
-      "changed_condition": "Changed $a_{51} = b_{51}$ to $a_{51} = b_{50}$",
-      "alternative_strategy": "Express $b_i = e^{\\log b_1 + (i-1)\\log 2} = b_1 \\cdot 2^{i-1}$. Then $a_i$ is an AP with $a_1 = b_1$, $a_{51} = b_{50} = b_1 \\cdot 2^{49}$. Compute $d_a = \\frac{b_1 \\cdot 2^{49} - b_1}{50} = \\frac{b_1(2^{49} - 1)}{50}$. Use this to compute $s = \\frac{51}{2}(2a_1 + 50d_a)$, compare with $t = b_1(2^{51} - 1)$, and evaluate $a_{101} = a_1 + 100d_a$ vs $b_{101} = b_1 \\cdot 2^{100}$.",
+      "attempts_used": 1,
+      "original_strategy": "Let \\(f(x)=\\int_0^x \\frac{t^2}{1+t^4}dt-(2x-1)\\). Since \\(f'(x)=\\frac{x^2}{1+x^4}-2<0\\) on \\([0,1]\\) and \\(f(0)>0>f(1)\\), \\(f\\) is strictly decreasing, so it has exactly one zero.",
+      "changed_condition": "The right-hand side \\(2x-1\\) was changed to \\(|2x-1|\\), creating a corner at \\(x=\\frac12\\) and making the derivative of the difference switch sign.",
+      "alternative_strategy": "Split the interval at \\(x=\\frac12\\). On \\([0,\\frac12]\\) use \\(u(x)=A(x)+2x-1\\), which is strictly increasing; on \\([\\frac12,1]\\) use \\(v(x)=A(x)-2x+1\\), which is strictly decreasing, and apply the intermediate value theorem on each piece.",
       "validation": {
         "model_a": {
-          "confidence": 0.98,
-          "answer_prime": "D",
-          "naive_answer": "B"
+          "confidence": 0.97,
+          "answer_prime": "B",
+          "naive_answer": "A"
         },
         "model_b": {
           "confidence": 1.0,
           "answer_prime": "B",
-          "naive_answer": null,
+          "naive_answer": "A",
           "valid_problem": true,
           "strategy_status": "INVALID"
         },
         "model_c": {
+          "confidence": 0.96,
+          "answer_prime": "B",
+          "naive_answer": "A",
+          "valid_problem": true,
+          "strategy_status": "INVALID"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "source": "JEE Adv 2016 Paper 1",
+      "source_index": 53,
+      "type": "Integer",
+      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - Integer\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nLet $\\alpha, \\beta \\in \\mathbb{R}$ be such that $\\lim _{x \\rightarrow 0} \\frac{x^{2} \\sin (\\beta x)}{\\alpha x-\\sin x}=1$.Then what is the value of $6(\\alpha+\\beta)$?\n\n\n",
+      "original_gold": "7",
+      "perturbed_problem": "Let \\alpha, \\beta \\in \\mathbb{R} be such that \\lim_{x \\to 0^-} \\frac{x^{2} \\sin(\\beta |x|)}{\\alpha x-\\sin x}=1. Then what is the value of 6(\\alpha+\\beta)?\n\n(A) 5\n\n(B) 7\n\n(C) -5\n\n(D) 1",
+      "answer_prime": "A",
+      "attempts_used": 1,
+      "original_strategy": "Use Taylor expansions: \\sin(\\beta x)\\sim \\beta x and \\sin x\\sim x-\\frac{x^3}{6}; a finite nonzero limit forces the x-term in the denominator to vanish (\\alpha=1), then \\frac{\\beta}{1/6}=1, so \\beta=1/6 and 6(\\alpha+\\beta)=7.",
+      "changed_condition": "The numerator is changed from \\sin(\\beta x) to \\sin(\\beta|x|) and the limit is taken from the left x\\to0^-; the absolute value is not analytic at 0, so the original Taylor substitution \\sin(\\beta x)\\sim\\beta x is no longer valid.",
+      "alternative_strategy": "Use the one-sided identity |x|=-x for x<0; then \\sin(\\beta|x|)=-\\sin(\\beta x)\\sim -\\beta x. Finite nonzero limit forces \\alpha=1, and then -6\\beta=1, so \\beta=-1/6, giving 6(\\alpha+\\beta)=5.",
+      "validation": {
+        "model_a": {
+          "confidence": 0.96,
+          "answer_prime": "A",
+          "naive_answer": "B"
+        },
+        "model_b": {
+          "confidence": 1.0,
+          "answer_prime": "A",
+          "naive_answer": "B",
+          "valid_problem": true,
+          "strategy_status": "INVALID"
+        },
+        "model_c": {
+          "confidence": 0.99,
+          "answer_prime": "A",
+          "naive_answer": "B",
+          "valid_problem": true,
+          "strategy_status": "INVALID"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "source": "JEE Adv 2016 Paper 1",
+      "source_index": 54,
+      "type": "Integer",
+      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - Integer\n### Source: JEE Adv 2016 Paper 1\n\n### Question:\nLet $z=\\frac{-1+\\sqrt{3} i}{2}$, where $i=\\sqrt{-1}$, and $r, s \\in\\{1,2,3\\}$. Let $P=\\left[\\begin{array}{cc}(-z)^{r} & z^{2 s} \\\\ z^{2 s} & z^{r}\\end{array}\\right]$ and $I$ be the identity matrix of order 2 . Then what is the total number of ordered pairs $(r, s)$ for which $P^{2}=-I$?\n\n\n",
+      "original_gold": "1",
+      "perturbed_problem": "Let \\(z=\\frac{-1+\\sqrt{3}i}{2}\\), where \\(i=\\sqrt{-1}\\), and \\(r,s\\in\\{1,2,3\\}\\). Let \\(P=\\begin{bmatrix}(-z)^r & z^{2s}-1\\\\ z^{2s}-1 & z^r\\end{bmatrix}\\) and \\(I\\) be the identity matrix of order 2. What is the total number of ordered pairs \\((r,s)\\) for which \\(P^2=-I\\)?\n\n(A) 1\n\n(B) 0\n\n(C) 2\n\n(D) 3",
+      "answer_prime": "B",
+      "attempts_used": 2,
+      "original_strategy": "Expand \\(P^2\\), use \\(z^{2s}\\neq0\\) to reduce the off-diagonal condition to \\((-z)^r+z^r=0\\), conclude \\(r\\) is odd, then solve \\(z^{2r}+z^{4s}=-1\\), giving \\((r,s)=(1,1)\\).",
+      "changed_condition": "The off-diagonal entry is changed from \\(z^{2s}\\) to \\(z^{2s}-1\\), so the common factor in the off-diagonal entry of \\(P^2\\) can be zero and the diagonal equation is also changed.",
+      "alternative_strategy": "Split into the cases \\(z^{2s}-1=0\\) and \\(z^{2s}-1\\neq0\\). If \\(s=3\\), the matrix is diagonal and \\(z^{2r}=-1\\) has no solution. If \\(s=1,2\\), the off-diagonal condition forces \\(r\\) odd; then checking \\(z^{2r}+(z^{2s}-1)^2=-1\\) for \\(r=1,3\\) and \\(s=1,2\\) gives no solutions. Thus the total number is 0.",
+      "validation": {
+        "model_a": {
           "confidence": 0.95,
           "answer_prime": "B",
-          "naive_answer": "B",
+          "naive_answer": "A"
+        },
+        "model_b": {
+          "confidence": 1.0,
+          "answer_prime": "B",
+          "naive_answer": "A",
+          "valid_problem": true,
+          "strategy_status": "INVALID"
+        },
+        "model_c": {
+          "confidence": 0.98,
+          "answer_prime": "B",
+          "naive_answer": "A",
+          "valid_problem": true,
+          "strategy_status": "INVALID"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "source": "JEE Adv 2016 Paper 2",
+      "source_index": 37,
+      "type": "MCQ",
+      "original_problem": "You are an expert mathematics AI assistant. Solve the following Joint Entrance Examination (JEE) Advanced level question step-by-step, then provide the final answer clearly.\n\n### Category: MATH - MCQ\n### Source: JEE Adv 2016 Paper 2\n\n### Question:\nLet $P=\\left[\\begin{array}{ccc}1 & 0 & 0 \\\\ 4 & 1 & 0 \\\\ 16 & 4 & 1\\end{array}\\right]$ and $I$ be the identity matrix of order 3. If $Q=\\left[q_{i j}\\right]$ is a matrix such that $P^{50}-Q=I$, then $\\frac{q_{31}+q_{32}}{q_{21}}$ equals\n\n(A) 52\n\n(B) 103\n\n(C) 201\n\n(D) 205\n\n\n",
+      "original_gold": "B",
+      "perturbed_problem": "Let \\(P=\\left[\\begin{array}{ccc}1&4&0\\\\1&1&0\\\\1&0&1\\end{array}\\right]\\) and \\(I\\) be the identity matrix of order 3. If \\(Q=[q_{ij}]\\) is a matrix such that \\(P^{50}-Q=I\\), then \\(\\frac{q_{31}+q_{32}}{q_{21}}\\) equals\n\n(A) 99\n\n(B) 3\n\n(C) 6\n\n(D) 51",
+      "answer_prime": "B",
+      "attempts_used": 1,
+      "original_strategy": "Write \\(P=I+A\\) with \\(A\\) strictly lower triangular, so \\(A^3=0\\), and expand \\(P^{50}=I+50A+\\binom{50}{2}A^2\\), then read off \\(q_{21},q_{31},q_{32}\\).",
+      "changed_condition": "\\(P\\) is no longer \\(I\\) plus a strictly lower triangular nilpotent matrix; for the new \\(P\\), \\(A=P-I\\) satisfies \\(A^3=4A\\neq 0\\), so the index-3 nilpotence assumption is removed.",
+      "alternative_strategy": "Use the relation \\(A^3=4A\\) to reduce every power of \\(A\\) to either \\(A\\) or \\(A^2\\). Then \\(P^{50}=I+\\alpha A+\\beta A^2\\), with \\(\\alpha=(3^{50}-1)/4\\) and \\(\\beta=(3^{50}-1)/8\\), and evaluate \\(Q=\\alpha A+\\beta A^2\\).",
+      "validation": {
+        "model_a": {
+          "confidence": 0.95,
+          "answer_prime": "B",
+          "naive_answer": "A"
+        },
+        "model_b": {
+          "confidence": 0.95,
+          "answer_prime": "B",
+          "naive_answer": "A",
+          "valid_problem": true,
+          "strategy_status": "INVALID"
+        },
+        "model_c": {
+          "confidence": 0.99,
+          "answer_prime": "B",
+          "naive_answer": "A",
           "valid_problem": true,
           "strategy_status": "INVALID"
         }
