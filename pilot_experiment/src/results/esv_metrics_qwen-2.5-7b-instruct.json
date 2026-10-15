@@ -1,0 +1,509 @@
+{
+  "experiment": {
+    "method": "ESV (recognition, diagnosis, alternative strategy, recovery, final answer) on initial failures",
+    "model": "qwen/qwen-2.5-7b-instruct",
+    "judge_model": "openai/gpt-oss-120b",
+    "reasoning": "default",
+    "judge_reasoning": "medium",
+    "solver_max_tokens": 4000,
+    "input_file": "C:\\Ekansh_Folders\\Ekansh_Folders\\2026\\RAEN_structural-perturbations-esv\\pilot_experiment\\src\\frozen_dataset.json",
+    "perturbation_generator_models": {
+      "a": "deepseek/deepseek-v4-flash-0731",
+      "b": "qwen/qwen3.5-35b-a3b",
+      "c": "openai/gpt-oss-120b"
+    },
+    "expected_instances": 32,
+    "started_at": "2026-10-15T04:26:37.952324+00:00",
+    "prompt_version": "esv_v4_2026-10-14",
+    "completed_instances": 32,
+    "failed_instances": [],
+    "last_updated_at": "2026-10-15T04:33:04.263981+00:00"
+  },
+  "groups": {
+    "overall": {
+      "instances": 32,
+      "initial_solving": {
+        "answer_accuracy": {
+          "n": 13,
+          "d": 32,
+          "rate": 0.4062
+        },
+        "failure_rate": {
+          "n": 19,
+          "d": 32,
+          "rate": 0.5938
+        },
+        "no_readable_answer": 1
+      },
+      "failure_recognition": {
+        "recognition_accuracy": {
+          "n": 15,
+          "d": 19,
+          "rate": 0.7895
+        },
+        "flagged_by_strategy_check": {
+          "n": 13,
+          "d": 19,
+          "rate": 0.6842
+        },
+        "flagged_by_disagreement": {
+          "n": 14,
+          "d": 19,
+          "rate": 0.7368
+        },
+        "independent_resolve_correct": {
+          "n": 3,
+          "d": 19,
+          "rate": 0.1579
+        }
+      },
+      "failure_diagnosis": {
+        "diagnosis_accuracy": {
+          "n": 3,
+          "d": 19,
+          "rate": 0.1579
+        },
+        "partial_diagnoses": 4,
+        "diagnosis_accuracy_given_recognized": {
+          "n": 3,
+          "d": 15,
+          "rate": 0.2
+        }
+      },
+      "alternative_strategy": {
+        "strategy_accuracy": {
+          "n": 7,
+          "d": 19,
+          "rate": 0.3684
+        },
+        "strategy_accuracy_given_correct_diagnosis": {
+          "n": 2,
+          "d": 3,
+          "rate": 0.6667
+        },
+        "self_verified_rate": {
+          "n": 19,
+          "d": 19,
+          "rate": 1.0
+        },
+        "needed_second_attempt": 2
+      },
+      "failure_recovery": {
+        "recovery_rate": {
+          "n": 5,
+          "d": 19,
+          "rate": 0.2632
+        },
+        "conditional_recovery_rate": {
+          "n": 4,
+          "d": 15,
+          "rate": 0.2667
+        },
+        "recovery_rate_given_valid_strategy": {
+          "n": 1,
+          "d": 7,
+          "rate": 0.1429
+        },
+        "correct_after_recovery_stage": {
+          "n": 5,
+          "d": 19,
+          "rate": 0.2632
+        },
+        "cross_check_correct": {
+          "n": 6,
+          "d": 19,
+          "rate": 0.3158
+        },
+        "derivations_agree": {
+          "n": 7,
+          "d": 19,
+          "rate": 0.3684
+        },
+        "accuracy_when_derivations_agree": {
+          "n": 3,
+          "d": 7,
+          "rate": 0.4286
+        },
+        "accuracy_when_adjudicated": {
+          "n": 2,
+          "d": 12,
+          "rate": 0.1667
+        },
+        "correct_after_final_answer_stage": {
+          "n": 5,
+          "d": 19,
+          "rate": 0.2632
+        },
+        "final_stage_fixed": 1,
+        "final_stage_broke": 1,
+        "repeated_initial_wrong_answer": {
+          "n": 4,
+          "d": 19,
+          "rate": 0.2105
+        }
+      },
+      "stage_funnel": {
+        "failures": 19,
+        "recognized": 15,
+        "recognized_and_diagnosed": 3,
+        "recognized_diagnosed_valid_strategy": 2,
+        "recognized_diagnosed_valid_strategy_recovered": 0
+      },
+      "final_accuracy": {
+        "initial": {
+          "n": 13,
+          "d": 32,
+          "rate": 0.4062
+        },
+        "after_esv": {
+          "n": 18,
+          "d": 32,
+          "rate": 0.5625
+        }
+      }
+    },
+    "original": {
+      "instances": 16,
+      "initial_solving": {
+        "answer_accuracy": {
+          "n": 6,
+          "d": 16,
+          "rate": 0.375
+        },
+        "failure_rate": {
+          "n": 10,
+          "d": 16,
+          "rate": 0.625
+        },
+        "no_readable_answer": 0
+      },
+      "failure_recognition": {
+        "recognition_accuracy": {
+          "n": 8,
+          "d": 10,
+          "rate": 0.8
+        },
+        "flagged_by_strategy_check": {
+          "n": 7,
+          "d": 10,
+          "rate": 0.7
+        },
+        "flagged_by_disagreement": {
+          "n": 8,
+          "d": 10,
+          "rate": 0.8
+        },
+        "independent_resolve_correct": {
+          "n": 2,
+          "d": 10,
+          "rate": 0.2
+        }
+      },
+      "failure_diagnosis": {
+        "diagnosis_accuracy": {
+          "n": 2,
+          "d": 10,
+          "rate": 0.2
+        },
+        "partial_diagnoses": 2,
+        "diagnosis_accuracy_given_recognized": {
+          "n": 2,
+          "d": 8,
+          "rate": 0.25
+        }
+      },
+      "alternative_strategy": {
+        "strategy_accuracy": {
+          "n": 5,
+          "d": 10,
+          "rate": 0.5
+        },
+        "strategy_accuracy_given_correct_diagnosis": {
+          "n": 2,
+          "d": 2,
+          "rate": 1.0
+        },
+        "self_verified_rate": {
+          "n": 10,
+          "d": 10,
+          "rate": 1.0
+        },
+        "needed_second_attempt": 1
+      },
+      "failure_recovery": {
+        "recovery_rate": {
+          "n": 3,
+          "d": 10,
+          "rate": 0.3
+        },
+        "conditional_recovery_rate": {
+          "n": 3,
+          "d": 8,
+          "rate": 0.375
+        },
+        "recovery_rate_given_valid_strategy": {
+          "n": 1,
+          "d": 5,
+          "rate": 0.2
+        },
+        "correct_after_recovery_stage": {
+          "n": 2,
+          "d": 10,
+          "rate": 0.2
+        },
+        "cross_check_correct": {
+          "n": 3,
+          "d": 10,
+          "rate": 0.3
+        },
+        "derivations_agree": {
+          "n": 4,
+          "d": 10,
+          "rate": 0.4
+        },
+        "accuracy_when_derivations_agree": {
+          "n": 1,
+          "d": 4,
+          "rate": 0.25
+        },
+        "accuracy_when_adjudicated": {
+          "n": 2,
+          "d": 6,
+          "rate": 0.3333
+        },
+        "correct_after_final_answer_stage": {
+          "n": 3,
+          "d": 10,
+          "rate": 0.3
+        },
+        "final_stage_fixed": 1,
+        "final_stage_broke": 0,
+        "repeated_initial_wrong_answer": {
+          "n": 2,
+          "d": 10,
+          "rate": 0.2
+        }
+      },
+      "stage_funnel": {
+        "failures": 10,
+        "recognized": 8,
+        "recognized_and_diagnosed": 2,
+        "recognized_diagnosed_valid_strategy": 2,
+        "recognized_diagnosed_valid_strategy_recovered": 0
+      },
+      "final_accuracy": {
+        "initial": {
+          "n": 6,
+          "d": 16,
+          "rate": 0.375
+        },
+        "after_esv": {
+          "n": 9,
+          "d": 16,
+          "rate": 0.5625
+        }
+      }
+    },
+    "perturbed": {
+      "instances": 16,
+      "initial_solving": {
+        "answer_accuracy": {
+          "n": 7,
+          "d": 16,
+          "rate": 0.4375
+        },
+        "failure_rate": {
+          "n": 9,
+          "d": 16,
+          "rate": 0.5625
+        },
+        "no_readable_answer": 1
+      },
+      "failure_recognition": {
+        "recognition_accuracy": {
+          "n": 7,
+          "d": 9,
+          "rate": 0.7778
+        },
+        "flagged_by_strategy_check": {
+          "n": 6,
+          "d": 9,
+          "rate": 0.6667
+        },
+        "flagged_by_disagreement": {
+          "n": 6,
+          "d": 9,
+          "rate": 0.6667
+        },
+        "independent_resolve_correct": {
+          "n": 1,
+          "d": 9,
+          "rate": 0.1111
+        }
+      },
+      "failure_diagnosis": {
+        "diagnosis_accuracy": {
+          "n": 1,
+          "d": 9,
+          "rate": 0.1111
+        },
+        "partial_diagnoses": 2,
+        "diagnosis_accuracy_given_recognized": {
+          "n": 1,
+          "d": 7,
+          "rate": 0.1429
+        }
+      },
+      "alternative_strategy": {
+        "strategy_accuracy": {
+          "n": 2,
+          "d": 9,
+          "rate": 0.2222
+        },
+        "strategy_accuracy_given_correct_diagnosis": {
+          "n": 0,
+          "d": 1,
+          "rate": 0.0
+        },
+        "self_verified_rate": {
+          "n": 9,
+          "d": 9,
+          "rate": 1.0
+        },
+        "needed_second_attempt": 1
+      },
+      "failure_recovery": {
+        "recovery_rate": {
+          "n": 2,
+          "d": 9,
+          "rate": 0.2222
+        },
+        "conditional_recovery_rate": {
+          "n": 1,
+          "d": 7,
+          "rate": 0.1429
+        },
+        "recovery_rate_given_valid_strategy": {
+          "n": 0,
+          "d": 2,
+          "rate": 0.0
+        },
+        "correct_after_recovery_stage": {
+          "n": 3,
+          "d": 9,
+          "rate": 0.3333
+        },
+        "cross_check_correct": {
+          "n": 3,
+          "d": 9,
+          "rate": 0.3333
+        },
+        "derivations_agree": {
+          "n": 3,
+          "d": 9,
+          "rate": 0.3333
+        },
+        "accuracy_when_derivations_agree": {
+          "n": 2,
+          "d": 3,
+          "rate": 0.6667
+        },
+        "accuracy_when_adjudicated": {
+          "n": 0,
+          "d": 6,
+          "rate": 0.0
+        },
+        "correct_after_final_answer_stage": {
+          "n": 2,
+          "d": 9,
+          "rate": 0.2222
+        },
+        "final_stage_fixed": 0,
+        "final_stage_broke": 1,
+        "repeated_initial_wrong_answer": {
+          "n": 2,
+          "d": 9,
+          "rate": 0.2222
+        }
+      },
+      "stage_funnel": {
+        "failures": 9,
+        "recognized": 7,
+        "recognized_and_diagnosed": 1,
+        "recognized_diagnosed_valid_strategy": 0,
+        "recognized_diagnosed_valid_strategy_recovered": 0
+      },
+      "final_accuracy": {
+        "initial": {
+          "n": 7,
+          "d": 16,
+          "rate": 0.4375
+        },
+        "after_esv": {
+          "n": 9,
+          "d": 16,
+          "rate": 0.5625
+        }
+      }
+    }
+  },
+  "perturbation_robustness": {
+    "complete_pairs": 16,
+    "initial": {
+      "accuracy_original": {
+        "n": 6,
+        "d": 16,
+        "rate": 0.375
+      },
+      "accuracy_perturbed": {
+        "n": 7,
+        "d": 16,
+        "rate": 0.4375
+      },
+      "accuracy_drop_pp": -6.25,
+      "pairs_both_correct": 3,
+      "pairs_original_only": 3,
+      "pairs_perturbed_only": 4,
+      "pairs_neither": 6
+    },
+    "after_esv": {
+      "accuracy_original": {
+        "n": 9,
+        "d": 16,
+        "rate": 0.5625
+      },
+      "accuracy_perturbed": {
+        "n": 9,
+        "d": 16,
+        "rate": 0.5625
+      },
+      "accuracy_drop_pp": 0.0,
+      "pairs_both_correct": 5,
+      "pairs_original_only": 4,
+      "pairs_perturbed_only": 4,
+      "pairs_neither": 3
+    }
+  },
+  "execution": {
+    "stage_calls": 177,
+    "api_requests_including_retries": 180,
+    "stage_status_counts": {
+      "completed": 177
+    },
+    "tokens": {
+      "prompt_tokens": 233770,
+      "completion_tokens": 128529,
+      "total_tokens": 362299
+    },
+    "total_latency_seconds": 1339.2
+  },
+  "definitions": {
+    "actual_failure": "Initial answer does not match the frozen gold answer (an unreadable/missing answer counts as a failure). ESV runs only on these.",
+    "recognized": "Stage 1 (blind: the model is not told its answer is wrong): the strategy check returned failure_recognized=true, or the independent re-solve gave a different answer than the initial one.",
+    "correctly_diagnosed": "Independent judge graded the stage 2 diagnosis CORRECT, given the gold answer and (for perturbed problems) the frozen changed-condition annotation.",
+    "valid_strategy": "Independent judge graded the stage 3 alternative strategy VALID (it leads to the gold answer when executed correctly).",
+    "recovered": "A failure whose stage 5 final answer matches the gold answer.",
+    "conditional_recovery_rate": "Recovered failures / failures recognized in stage 1.",
+    "accuracy_drop_pp": "Accuracy on originals minus accuracy on perturbed, over complete pairs, in percentage points."
+  }
+}

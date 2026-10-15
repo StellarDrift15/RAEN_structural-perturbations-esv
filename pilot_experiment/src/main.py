@@ -33,9 +33,30 @@ except ModuleNotFoundError:
         A_FIELDS, SOLVE_FIELDS, STRATEGY_FIELDS,
     )
 
-# Fetch the API key from src/.env:
-load_dotenv(os.path.join(SRC_DIR, ".env"))
+# Fetch the API key from the .env kept outside the repo (e.g. C:\Ekansh_Folders\Ekansh_Folders\2026\env):
+# RAEN_ENV_FILE if set, else the nearest .env or env file (Explorer can drop the leading dot) in a parent folder.
+def find_env_file():
+  if os.environ.get("RAEN_ENV_FILE"):
+    return os.environ["RAEN_ENV_FILE"]
+  folder = SRC_DIR
+  while True:
+    for name in (".env", "env"):
+      candidate = os.path.join(folder, name)
+      if os.path.isfile(candidate):
+        return candidate
+    parent = os.path.dirname(folder)
+    if parent == folder:
+      return None
+    folder = parent
+
+
+ENV_FILE = find_env_file()
+if ENV_FILE:
+  load_dotenv(ENV_FILE)
 GPT_KEY = os.environ.get('OPENROUTER_API_KEY')
+if not GPT_KEY:
+  sys.exit(f"OPENROUTER_API_KEY is not set (.env used: {ENV_FILE or 'none found'}). "
+           "Set RAEN_ENV_FILE to the path of your .env, or place the .env in a parent folder of this script.")
 
 # Pipeline (unchanged):
 # Stage 1: Create the perturbation of the original problem using model A
@@ -54,8 +75,8 @@ GPT_KEY = os.environ.get('OPENROUTER_API_KEY')
 # TIME_BUDGET_SECONDS: hard wall-clock limit. When it is reached no new calls are started, everything that has
 #   finished is saved to frozen_dataset.json, and the script exits (problems still in progress are dropped).
 FAST_MODE = False
-TIME_BUDGET_SECONDS = None  # 9 minutes; set to None for no limit
-CALL_TIMEOUT = 100 if FAST_MODE else 200  # seconds per API call
+TIME_BUDGET_SECONDS = 3600  # 60 minutes; set to None for no limit
+CALL_TIMEOUT = 100 if FAST_MODE else 300  # seconds per API call
 
 STOP = threading.Event()  # set when the time budget is reached
 DEADLINE = None
@@ -80,13 +101,20 @@ model_b = "qwen/qwen3.5-35b-a3b"             # independent solver / strategy che
 model_c = "openai/gpt-oss-120b"              # independent solver / strategy checker (reasoning cannot be fully switched off)
 
 CONFIDENCE_THRESHOLD = 0.6
-NUM_PROBLEMS = 20
-MAX_ATTEMPTS = 2  # perturbation attempts per original problem
+NUM_PROBLEMS = 24  # original problems processed in this run, starting at START_INDEX
+
+# Expanding an existing frozen dataset: process math problems [START_INDEX, START_INDEX + NUM_PROBLEMS) and append
+# the accepted pairs to frozen_dataset.json. Existing pairs and their ids are never changed; a source problem that
+# is already in the dataset is skipped. Set APPEND_TO_EXISTING = False and START_INDEX = 0 to build from scratch.
+APPEND_TO_EXISTING = True
+START_INDEX = 20  # problems 0-19 produced the first 16 pairs
+TARGET_NEW_PAIRS = 16  # keep at most this many new pairs (in source order); None keeps all accepted
+MAX_ATTEMPTS = 3  # perturbation attempts per original problem
 REQUIRED_BREAK_VOTES = 2  # verifiers (of 2) whose application of the original strategy must visibly fail (was 1)
 REQUIRE_A_AGREEMENT = False  # if False, only Models B and C (the independent solvers) must agree on answer_prime
 NONE_COUNTS_AS_BROKEN = False  # naive_answer NONE ("S cannot be carried out") counts as a break vote only if True AND status is INVALID/INSUFFICIENT
 REJECT_UNCHANGED_OPTIONS = True  # reject P' whose four options are identical to the original's
-MAX_CALL_RETRIES = 2  # retries per model call on API/parse failure
+MAX_CALL_RETRIES = 3  # retries per model call on API/parse failure
 MAX_TOKENS = 3500  # default output cap per call (includes reasoning tokens); per-model caps below override it
 MAX_TOKENS_CEILING = 32000  # a response truncated by the cap is retried once with the cap doubled, up to this
 MAX_WORKERS = 4  # original problems processed in parallel (lower this if you see 429 rate-limit errors)
@@ -261,9 +289,16 @@ def has_options(problem_text):
   return all(re.search(rf"\(\s*{letter}\s*\)|(?:^|\n)\s*{letter}\s*[.)]", problem_text, re.IGNORECASE) for letter in "ABCD")
 
 
+def normalize_math_delimiters(text):
+  r"""Converts \( ... \) to $...$ and \[ ... \] to $$...$$ so P' uses the same LaTeX style as the original problems."""
+  text = re.sub(r"(?<!\\)\\\((.*?)\\\)", lambda m: f"${m.group(1).strip()}$", text, flags=re.DOTALL)
+  text = re.sub(r"(?<!\\)\\\[(.*?)\\\]", lambda m: f"$${m.group(1).strip()}$$", text, flags=re.DOTALL)
+  return text
+
+
 def assemble_problem(candidate):
   """Returns the P' stem with its (A)-(D) options appended in a standard format, or None if options are missing."""
-  stem = str(candidate["P_prime"]).strip()
+  stem = normalize_math_delimiters(str(candidate["P_prime"]).strip())
   if has_options(stem):
     return stem
   options = candidate.get("options")
@@ -272,6 +307,12 @@ def assemble_problem(candidate):
 
   def fmt(text):
     t = str(text).strip()
+    stray = re.search(r"</?[A-Za-z_][A-Za-z_0-9]*>", t)  # model glitch like "380</option_C>380": keep what precedes the stray tag
+    if stray:
+      t = t[:stray.start()].strip()
+    if len(t) > 1 and t.startswith("$") and t.endswith("$") and "\\(" in t:
+      t = t[1:-1].strip()  # $\(x\)$ or $text \(x\)$: drop the outer $ pair first
+    t = normalize_math_delimiters(t)
     return t if "$" in t or "\\" not in t else f"${t}$"  # bare LaTeX like \frac{7\pi}{9} -> $\frac{7\pi}{9}$
   return stem + "\n\n" + "\n\n".join(f"({letter}) {fmt(options[letter])}" for letter in "ABCD")
 
@@ -462,13 +503,26 @@ def process_problem(i, df):
   return i, None
 
 
+def load_existing_dataset(path):
+  if not APPEND_TO_EXISTING or not os.path.exists(path):
+    return None
+  with open(path, encoding="utf-8") as f:
+    return json.load(f)
+
+
 def save(results, total):
-  """Writes accepted pairs (ordered by source problem) to frozen_dataset.json."""
-  frozen_dataset = []
-  for i in sorted(results):
-    if results[i] is not None:
-      frozen_dataset.append({"id": len(frozen_dataset), **results[i]})
+  """Writes accepted pairs (ordered by source problem) to frozen_dataset.json, after any existing pairs."""
   output_path = os.path.join(SRC_DIR, "frozen_dataset.json")
+  existing = load_existing_dataset(output_path)
+  frozen_dataset = list(existing["pairs"]) if existing else []
+  known_sources = {(p.get("source"), p.get("source_index")) for p in frozen_dataset}
+  new_pairs = [results[i] for i in sorted(results)
+               if results[i] is not None and (results[i]["source"], results[i]["source_index"]) not in known_sources]
+  if TARGET_NEW_PAIRS is not None:
+    new_pairs = new_pairs[:TARGET_NEW_PAIRS]
+  next_id = max((p["id"] for p in frozen_dataset), default=-1) + 1
+  for offset, pair in enumerate(new_pairs):
+    frozen_dataset.append({"id": next_id + offset, **pair})
   models = {"a": model_a, "b": model_b, "c": model_c}
   if ENABLE_AUDIT:
     models["audit"] = AUDIT_MODEL
@@ -477,14 +531,14 @@ def save(results, total):
         {
             "models": models,
             "confidence_threshold": CONFIDENCE_THRESHOLD,
-            "problems_processed": len(results),
-            "problems_requested": total,
+            "problems_processed": (existing.get("problems_processed", 0) if existing else 0) + len(results),
+            "problems_requested": (existing.get("problems_requested", 0) if existing else 0) + total,
             "num_pairs": len(frozen_dataset),
             "pairs": frozen_dataset,
         },
         f, indent=2, ensure_ascii=False, default=str,
     )
-  print(f"\nFrozen dataset size: {len(frozen_dataset)} (saved to {output_path})")
+  print(f"\nFrozen dataset size: {len(frozen_dataset)} ({len(new_pairs)} new; saved to {output_path})")
 
 
 def main():
@@ -503,7 +557,9 @@ def main():
 
   # Core Loop Logic (problems run in parallel; results are saved on Ctrl+C or when the time budget runs out)
   global DEADLINE
-  total = min(NUM_PROBLEMS, len(math_jeebench_df))
+  start = START_INDEX if APPEND_TO_EXISTING else 0
+  end = min(start + NUM_PROBLEMS, len(math_jeebench_df))
+  total = end - start
   results = {}
   start_time = time.perf_counter()
   DEADLINE = time.time() + TIME_BUDGET_SECONDS if TIME_BUDGET_SECONDS else None
@@ -511,7 +567,7 @@ def main():
   futures = []
   timed_out = False
   try:
-    futures = [executor.submit(process_problem, i, math_jeebench_df) for i in range(total)]
+    futures = [executor.submit(process_problem, i, math_jeebench_df) for i in range(start, end)]
     progress = tqdm(as_completed(futures, timeout=(TIME_BUDGET_SECONDS or None)), total=total, desc="Original problems", unit="problem")
     for fut in progress:
       i, row = fut.result()
