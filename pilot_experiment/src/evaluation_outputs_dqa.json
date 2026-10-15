@@ -1,0 +1,82 @@
+[
+  {
+    "id": 0,
+    "original_response": "A",
+    "perturbed_response": "A"
+  },
+  {
+    "id": 1,
+    "original_response": "B",
+    "perturbed_response": "C"
+  },
+  {
+    "id": 2,
+    "original_response": "-\\frac{7\\pi}{9}",
+    "perturbed_response": "\\(\\frac{2 \\pi}{3}\\)"
+  },
+  {
+    "id": 3,
+    "original_response": "\\(\\frac{36}{73}\\)",
+    "perturbed_response": "(C)"
+  },
+  {
+    "id": 4,
+    "original_response": "(B) $\\frac{1}{32}$",
+    "perturbed_response": "(B) $\\(\\frac{1}{16}\\)$"
+  },
+  {
+    "id": 5,
+    "original_response": "B",
+    "perturbed_response": "B"
+  },
+  {
+    "id": 6,
+    "original_response": "A",
+    "perturbed_response": "A"
+  },
+  {
+    "id": 7,
+    "original_response": "A",
+    "perturbed_response": "B"
+  },
+  {
+    "id": 8,
+    "original_response": "B",
+    "perturbed_response": "B"
+  },
+  {
+    "id": 9,
+    "original_response": "(C) $\\left(\\frac{1}{3},-\\frac{1}{\\sqrt{3}}\\right)$",
+    "perturbed_response": "(B)"
+  },
+  {
+    "id": 10,
+    "original_response": "3",
+    "perturbed_response": "A"
+  },
+  {
+    "id": 11,
+    "original_response": "2",
+    "perturbed_response": "5"
+  },
+  {
+    "id": 12,
+    "original_response": "2",
+    "perturbed_response": "B"
+  },
+  {
+    "id": 13,
+    "original_response": "12",
+    "perturbed_response": "B"
+  },
+  {
+    "id": 14,
+    "original_response": "4",
+    "perturbed_response": "C"
+  },
+  {
+    "id": 15,
+    "original_response": "205",
+    "perturbed_response": "3"
+  }
+]
