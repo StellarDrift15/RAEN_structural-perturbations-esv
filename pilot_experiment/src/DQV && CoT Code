@@ -1,0 +1,179 @@
+import json
+from openai import OpenAI
+
+# 1. Initialize the API Client with your OpenRouter key
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1", 
+    api_key="sk-or-v1-..."
+)
+
+MODEL_ID = "qwen/qwen-2.5-7b-instruct"
+
+# 2. Load the Dataset
+dataset_path = "frozen_dataset.json"
+with open(dataset_path, "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+pairs = data.get("pairs", [])
+print(f"Loaded {len(pairs)} problem pairs from {dataset_path}.")
+
+# 3. Define Prompt Strategies
+def run_cot_inference(problem_text):
+    """Runs Chain of Thought prompt evaluation using the OpenRouter API."""
+    response = client.chat.completions.create(
+        model=MODEL_ID,
+        messages=[
+            {"role": "system", "content": "You are an expert mathematics AI assistant. Solve the following question step-by-step, then provide the final answer clearly."},
+            {"role": "user", "content": f"{problem_text}\n\nPlease reason step by step, and put your final answer clearly."}
+        ],
+        temperature=0.0,
+        max_tokens=1024
+    )
+    return response.choices[0].message.content.strip()
+
+def run_dqa_inference(problem_text):
+    """Runs Direct Answer prompt evaluation without step-by-step instructions."""
+    response = client.chat.completions.create(
+        model=MODEL_ID,
+        messages=[
+            {"role": "system", "content": "You are a direct answering assistant. Provide ONLY the final answer clearly without intermediate steps or explanations."},
+            {"role": "user", "content": f"{problem_text}\n\nProvide the direct final answer only."}
+        ],
+        temperature=0.0,
+        max_tokens=256
+    )
+    return response.choices[0].message.content.strip()
+
+# 4. Run Evaluation for Both Strategies
+cot_results = []
+dqa_results = []
+
+for pair in pairs:
+    pair_id = pair.get("id")
+    orig_text = pair.get("original_problem")
+    pert_text = pair.get("perturbed_problem")
+    
+    print(f"\n--- Processing Pair ID: {pair_id} ---")
+    
+    # --- Chain of Thought Evaluation ---
+    print("Running CoT on Original and Perturbed problems...")
+    cot_orig_response = run_cot_inference(orig_text)
+    cot_pert_response = run_cot_inference(pert_text)
+    cot_results.append({
+        "id": pair_id,
+        "original_response": cot_orig_response,
+        "perturbed_response": cot_pert_response
+    })
+    
+    # --- Direct Answer Evaluation ---
+    print("Running DQA on Original and Perturbed problems...")
+    dqa_orig_response = run_dqa_inference(orig_text)
+    dqa_pert_response = run_dqa_inference(pert_text)
+    dqa_results.append({
+        "id": pair_id,
+        "original_response": dqa_orig_response,
+        "perturbed_response": dqa_pert_response
+    })
+
+# 5. Save Results to Separate JSON Files
+with open("evaluation_outputs_cot.json", "w", encoding="utf-8") as f:
+    json.dump(cot_results, f, indent=2, ensure_ascii=False)
+
+with open("evaluation_outputs_dqa.json", "w", encoding="utf-8") as f:
+    json.dump(dqa_results, f, indent=2, ensure_ascii=False)
+
+print("\nEvaluation complete!")
+print("CoT outputs saved to evaluation_outputs_cot.json")
+print("DQA outputs saved to evaluation_outputs_dqa.json")
+
+
+
+
+import json
+import re
+
+# 1. Load the ground truth dataset
+with open("frozen_dataset.json", "r", encoding="utf-8") as f:
+    ground_truth_data = json.load(f)
+
+gt_dict = {pair["id"]: pair for pair in ground_truth_data.get("pairs", [])}
+
+# 2. Load both evaluation output files
+# Make sure you ran your pipeline twice and saved them to these files:
+with open("evaluation_outputs_cot.json", "r", encoding="utf-8") as f:
+    cot_outputs = {item["id"]: item for item in json.load(f)}
+
+with open("evaluation_outputs_dqa.json", "r", encoding="utf-8") as f:
+    dqa_outputs = {item["id"]: item for item in json.load(f)}
+
+# 3. Helper function to extract a clean answer from model text
+def extract_answer(text):
+    if not text:
+        return ""
+    
+    # Search for structured final answer patterns
+    match = re.search(r'(?:final answer|answer is|correct option is)[\s:]*([A-D0-9]+)', text, re.IGNORECASE)
+    if match:
+        return match.group(1).strip().upper()
+    
+    # Fallback: check the last non-empty line
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
+    if lines:
+        last_line = lines[-1]
+        if len(last_line) <= 5:  # Short choice letter like "C" or multi-choice like "BC"
+            return last_line.strip().upper()
+            
+    return text.strip().upper()
+
+# 4. Evaluation Counters
+total_samples = len(gt_dict)
+
+cot_orig_correct = 0
+cot_pert_correct = 0
+dqa_orig_correct = 0
+dqa_pert_correct = 0
+
+print("--- Evaluating CoT vs DQA Performance ---")
+
+for item_id, gt in gt_dict.items():
+    orig_gold = str(gt.get("original_gold", "")).strip().upper()
+    pert_gold = str(gt.get("answer_prime", "")).strip().upper()
+    
+    # --- CoT Evaluation ---
+    cot_item = cot_outputs.get(item_id, {})
+    cot_orig_pred = extract_answer(cot_item.get("original_response", ""))
+    cot_pert_pred = extract_answer(cot_item.get("perturbed_response", ""))
+    
+    if orig_gold in cot_orig_pred or cot_orig_pred == orig_gold:
+        cot_orig_correct += 1
+    if pert_gold in cot_pert_pred or cot_pert_pred == pert_gold:
+        cot_pert_correct += 1
+        
+    # --- DQA Evaluation ---
+    dqa_item = dqa_outputs.get(item_id, {})
+    dqa_orig_pred = extract_answer(dqa_item.get("original_response", ""))
+    dqa_pert_pred = extract_answer(dqa_item.get("perturbed_response", ""))
+    
+    if orig_gold in dqa_orig_pred or dqa_orig_pred == orig_gold:
+        dqa_orig_correct += 1
+    if pert_gold in dqa_pert_pred or dqa_pert_pred == pert_gold:
+        dqa_pert_correct += 1
+
+# 5. Compute Percentages
+cot_orig_acc = (cot_orig_correct / total_samples) * 100 if total_samples > 0 else 0
+cot_pert_acc = (cot_pert_correct / total_samples) * 100 if total_samples > 0 else 0
+dqa_orig_acc = (dqa_orig_correct / total_samples) * 100 if total_samples > 0 else 0
+dqa_pert_acc = (dqa_pert_correct / total_samples) * 100 if total_samples > 0 else 0
+
+# 6. Print Summary Report
+print("\n==================================================")
+print(f"Total Problem Pairs Evaluated: {total_samples}")
+print("==================================================")
+print("CHAIN OF THOUGHT (CoT):")
+print(f"  * Original Accuracy:  {cot_orig_acc:.2f}% ({cot_orig_correct}/{total_samples})")
+print(f"  * Perturbed Accuracy: {cot_pert_acc:.2f}% ({cot_pert_correct}/{total_samples})")
+print("--------------------------------------------------")
+print("DIRECT ANSWER (DQA):")
+print(f"  * Original Accuracy:  {dqa_orig_acc:.2f}% ({dqa_orig_correct}/{total_samples})")
+print(f"  * Perturbed Accuracy: {dqa_pert_acc:.2f}% ({dqa_pert_correct}/{total_samples})")
+print("==================================================")
