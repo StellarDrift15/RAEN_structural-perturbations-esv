@@ -5,6 +5,9 @@ Stage 1 needs only the CoT samples (records.json), so it is reported even before
 reported from esv3_records.json. Every comparison is paired on the same instances; fixes / breaks are vs CoT maj@4,
 the answer every method starts from.
 
+--verifier-model reads the ESV v3 arm from esv3_records.<verifier>.json, but the USC arm always comes from
+esv3_records.json: USC asks the solver, not the verifier, so run_esv3.py measures it once, in the self-verify run.
+
   python experiments/analyze_esv3.py                    # current (large) solvers
   python experiments/analyze_esv3.py --limit-pairs 30   # stage 1 on the first 30 pairs only
 """
@@ -83,7 +86,18 @@ def base_row(inst: Dict[str, Any], naive: Optional[str] = None) -> Dict[str, Any
     }
 
 
-def load(models, limit_pairs, v3_file: str = "esv3_records.json", min_pair=None, max_pair=None):
+def read_v3(folder: Path, name: str) -> Dict[str, Any]:
+    if not (folder / name).exists():
+        return {}
+    return {i: redecide(r) for i, r in json.loads((folder / name).read_text(encoding="utf-8"))["instances"].items()
+            if r.get("version") == V3_VERSION}
+
+
+def load(models, limit_pairs, v3_file: str = "esv3_records.json", min_pair=None, max_pair=None,
+         usc_file: Optional[str] = None):
+    """The ESV v3 arm is read from v3_file. USC has no verifier, so run_esv3.py measures it only in the self-verify
+    condition; under --verifier-model its arm is read from usc_file (esv3_records.json) instead. Reading it from the
+    verifier file would report CoT maj@4 under USC's name, because a skipped USC falls back to the initial answer."""
     per_model: Dict[str, List[Dict[str, Any]]] = {}
     naive = naive_answers(json.loads(common.FROZEN_DATASET.read_text(encoding="utf-8")) if common.FROZEN_DATASET.exists() else {})
     for model in models:
@@ -91,13 +105,19 @@ def load(models, limit_pairs, v3_file: str = "esv3_records.json", min_pair=None,
         if not (folder / "records.json").exists():
             continue
         base = json.loads((folder / "records.json").read_text(encoding="utf-8"))["instances"]
-        v3 = {}
-        if (folder / v3_file).exists():
-            v3 = {i: redecide(r) for i, r in json.loads((folder / v3_file).read_text(encoding="utf-8"))["instances"].items()
-                  if r.get("version") == V3_VERSION}
+        v3 = read_v3(folder, v3_file)
+        usc_src = v3 if not usc_file or usc_file == v3_file else read_v3(folder, usc_file)
         complete = [i for i, r in base.items() if all(s is not None for s in r["samples"]["cot"]) and all(s is not None for s in r["samples"]["dqa"])]
         ids = sorted(v3) if v3 else [i for i in complete if limit_pairs is None or int(base[i]["pair_id"]) < limit_pairs]
         ids = [i for i in ids if not common.is_disputed(i)]
+        if v3:
+            unscored = [i for i in ids if (usc_src.get(i) or v3[i])["methods"]["usc"]["final_correct"] is None]
+            if unscored:
+                raise SystemExit(
+                    f"{model}: the USC arm is unmeasured for {len(unscored)} of {len(ids)} instances in "
+                    f"{usc_file or v3_file}. USC asks the solver, not the verifier, so it is only run in the "
+                    f"self-verify condition. Run `run_esv3.py` without --verifier-model first so that "
+                    f"{usc_file or 'esv3_records.json'} exists for this model, then re-run this report.")
         if min_pair is not None:
             ids = [i for i in ids if int(base[i]["pair_id"]) >= min_pair]
         if max_pair is not None:
@@ -107,10 +127,12 @@ def load(models, limit_pairs, v3_file: str = "esv3_records.json", min_pair=None,
             row = base_row(base[i], naive.get(base[i]["pair_id"]))
             if i in v3:
                 r = v3[i]
+                u = (usc_src.get(i) or r)["methods"]["usc"]  # USC from the self-verify run under --verifier-model
                 row["v3"] = r
-                row["correct"].update(esv3=bool(r["methods"]["esv3"]["final_correct"]), usc=bool(r["methods"]["usc"]["final_correct"]))
-                row["tokens"].update(esv3=tokens(r["methods"]["esv3"]["call"]), usc=tokens(r["methods"]["usc"]["call"]))
-                row["calls"].update(esv3=int(r["methods"]["esv3"]["call"] is not None), usc=int(r["methods"]["usc"]["call"] is not None))
+                row["usc_selection"] = u.get("selection")
+                row["correct"].update(esv3=bool(r["methods"]["esv3"]["final_correct"]), usc=bool(u["final_correct"]))
+                row["tokens"].update(esv3=tokens(r["methods"]["esv3"]["call"]), usc=tokens(u["call"]))
+                row["calls"].update(esv3=int(r["methods"]["esv3"]["call"] is not None), usc=int(u["call"] is not None))
             rows.append(row)
         if rows:
             per_model[model] = rows
@@ -226,6 +248,89 @@ def selection_table(rows: List[Dict[str, Any]]) -> str:
     return table([f"Choice among the candidates ({len(dis)} disagreeing instances)", "right"], out)
 
 
+def pipeline(verifier_model: Optional[str], has_v3: bool) -> List[str]:
+    """The stages exactly as run_esv3.py applies them, and where USC sits relative to them. Written out in full
+    because 'stages 1-3' alone does not say who is called, when, or what happens when a stage declines to act."""
+    checker = verifier_model or "the solver itself (self-verification)"
+    ran = "run, measured below" if has_v3 else "built, not run yet"
+    stages = [
+        ["0", "CoT sampling (shared input, not part of ESV)",
+         "The solver answers the problem 4 times with chain-of-thought. Produced once by `run_methods.py` and reused "
+         "unchanged by every method, so nothing below ever re-solves the problem.",
+         "4 per instance, T = 0.7, seeds 0-3", "solver",
+         "4 answers. Their majority is the `initial` answer and is scored as the CoT maj@4 baseline."],
+        ["1", "Disagreement gate",
+         "Group the 4 answers into distinct candidates by normalized value, in order of first appearance, keeping "
+         "each one's vote count. Unreadable answers are dropped.",
+         "0 (free)", "none",
+         "Fewer than 2 distinct candidates -> decision `unanimous`: keep the initial answer and STOP. "
+         "2 or more -> go to stage 2."],
+        ["2", "Contrastive verification",
+         "All distinct candidates in ONE call, one representative solution each, in order of first appearance, with "
+         "vote counts hidden. Per candidate: the strategy, its bindings to quoted givens (MATCHES / MISMATCH), the "
+         "conditions the method needs (HOLDS / VIOLATED), then the first divergence point, then SOUND or FLAWED with "
+         "a failure type (BINDING / METHOD / COMPUTATION), the flawed step and the corrected fact.",
+         "1 per disagreeing instance, T = 0", checker,
+         f"A filled-in check per candidate ({ran})."],
+        ["3", "Decision rule (code only, no model)",
+         "A candidate is strictly SOUND only if its verdict is SOUND **and** it lists zero MISMATCH **and** zero "
+         "VIOLATED. Exactly one such candidate wins; several, the one with the most votes (ties to the initial "
+         "answer, then to the earliest); none, nothing is chosen.",
+         "0 (free)", "none",
+         "`one_sound` -> take that candidate. `several_sound` -> take the most-voted SOUND one. "
+         "`none_sound` -> keep the initial answer. `unreadable` -> keep the initial answer."],
+        ["4", "Diagnosis-driven repair",
+         "Would re-solve using the diagnosis from stage 2 where no candidate survives. NOT BUILT: `none_sound` "
+         "simply keeps the initial answer, so ESV never invents an answer the solver did not already produce.",
+         "n/a", "n/a",
+         "Not built. Its ceiling is the `a candidate is right` column of the decisions table below."],
+        ["5", "Scoring",
+         "Gold enters here and nowhere else. Paired against CoT maj@4 on the same instances, with exact McNemar "
+         "tests, so a stage can break a correct majority as easily as repair a wrong one.",
+         "0 (free)", "none", "The accuracy tables below."],
+    ]
+    usc_when = ("Not measured in this report: USC asks the solver, so it is run once, in the self-verify condition, "
+                "and read from `esv3_records.json`.") if verifier_model else "Measured in this report."
+    return [
+        "## The pipeline, as run", "",
+        "Every method starts from the same 4 CoT samples and none of them re-solves the problem; they differ only in "
+        "how they pick among answers the solver already produced. ESV fires only on disagreement, so it can damage a "
+        "correct majority as easily as repair a wrong one, and is scored that way.", "",
+        table(["#", "Stage", "What it does", "Calls", "Model called", "Outcome"], stages), "",
+        "### Where USC sits (the baseline, not a stage)", "",
+        "Universal Self-Consistency is the control ESV must beat, not a step inside it. It replaces stages 2-3 with a "
+        "single selection call and is wired in deliberately parallel to them:", "",
+        "- **When it fires:** on exactly the same instances as stage 2, the disagreeing ones (2 or more distinct "
+        "readable candidates). A `unanimous` instance never calls it and keeps the majority answer, so USC and CoT "
+        "maj@4 agree there by construction.",
+        "- **Who is called:** the **solver**, never the verifier. USC has no verifier, which is why it is identical "
+        f"in both conditions. ({usc_when})",
+        "- **What it sees:** all 4 samples including duplicates, in arbitrary order, with the reasoning shown. Unlike "
+        "stage 2 it is therefore free to count multiplicity: it can see that 3 of 4 samples agree.",
+        "- **How it answers:** one `<selected_response>` tag naming the response it picks. Resolved first as a "
+        "response label (1-4), then as the selected answer's value, which solvers frequently return instead.",
+        "- **When it declines:** a tag that resolves to neither keeps the initial answer, i.e. USC falls back to CoT "
+        "maj@4. The rate is reported under *Did USC actually select?* and must be read before any USC comparison.", "",
+    ]
+
+
+def usc_health(per_model: Dict[str, List[Dict[str, Any]]]) -> str:
+    """How USC's selection tag parsed. An unresolved selection keeps the initial answer, so a high unresolved rate
+    makes USC collapse onto CoT maj@4 - the first thing to check whenever the two accuracies coincide."""
+    out = []
+    for model, rows in list(per_model.items()) + [("**pooled**", [r for rs in per_model.values() for r in rs])]:
+        calls = [r["usc_selection"] for r in rows if r.get("usc_selection")]
+        if not calls:
+            continue
+        c = Counter(calls)
+        out.append([model, len(calls), pct(c["label"], len(calls)), pct(c["value"], len(calls)),
+                    pct(c["ambiguous"], len(calls)), pct(c["unresolved"], len(calls))])
+    if not out:
+        return ""
+    return table(["model", "USC calls", "by response label", "by answer value", "ambiguous (label used)",
+                  "unresolved -> keeps CoT maj@4"], out)
+
+
 def breakdown(rows: List[Dict[str, Any]], keys) -> str:
     out = []
     for arm in ARMS:
@@ -251,7 +356,8 @@ def main(argv: List[str] = None) -> int:
     parser.add_argument("--models", choices=list(MODEL_SETS), default="large")
     parser.add_argument("--limit-pairs", type=int, default=None, help="stage 1 only, before run_esv3.py has run")
     parser.add_argument("--verifier-model", default=None,
-                        help="Read the esv3_records.<verifier>.json written by run_esv3.py --verifier-model")
+                        help="Read the ESV v3 arm from the esv3_records.<verifier>.json written by run_esv3.py "
+                             "--verifier-model. The USC arm has no verifier and is always read from esv3_records.json")
     parser.add_argument("--min-pair", type=int, default=None,
                         help="Score only pairs >= this id (e.g. 60 = the held-out split; 0-59 is the dev set)")
     parser.add_argument("--max-pair", type=int, default=None,
@@ -260,7 +366,7 @@ def main(argv: List[str] = None) -> int:
     common.select_benchmark(args.benchmark)
     vslug = model_slug(args.verifier_model) if args.verifier_model else None
     per_model = load(MODEL_SETS[args.models], args.limit_pairs, f"esv3_records.{vslug}.json" if vslug else "esv3_records.json",
-                     args.min_pair, args.max_pair)
+                     args.min_pair, args.max_pair, usc_file="esv3_records.json" if vslug else None)
     if not per_model:
         print(f"No records.json for the {args.models} models.", file=sys.stderr)
         return 2
@@ -276,10 +382,10 @@ def main(argv: List[str] = None) -> int:
     out = [f"# ESV v3, stage by stage ({common.benchmark_info()['label']}, {args.models} models{verifier_note})", "",
            f"Version `{V3_VERSION}`, decision rule `{DECISION_RULE}`. Gold is used only to score. Design and motivation: "
            "`esv_bottleneck_analysis.md`.", "",
-           "| Stage | Status |", "|---|---|",
-           "| 1. Disagreement gate | built, measured below |",
-           f"| 2-3. Candidate verification + choice | {'run, measured below' if has_v3 else 'built, not run yet'} |",
-           "| 4. Diagnosis-driven repair | not built (decision `none_sound` keeps the initial answer) |", "",
+           *([f"The ESV v3 arm is verified by {args.verifier_model}; the USC arm is read from `esv3_records.json`, "
+              "because USC asks the solver (it has no verifier) and is measured once, in the self-verify run.", ""]
+             if args.verifier_model else []),
+           *pipeline(args.verifier_model, has_v3),
            *([f"Excluded from every score: {len(disputed)} instances whose published gold is wrong or ambiguous "
               f"(`common.DISPUTED_INSTANCES`): {', '.join(sorted(disputed))}.", ""] if disputed else []),
            "## Stage 1: disagreement gate (no calls)", "",
@@ -297,6 +403,12 @@ def main(argv: List[str] = None) -> int:
             out += [f"**{model}** ({len(rows)} instances)", "", accuracy_table(rows), ""]
         out += [f"**Pooled** ({len(pooled)} instances)", "", accuracy_table(pooled), "",
                 "ESV v3 vs USC (ESV-only / USC-only right, McNemar p): " + "{} / {} (p={})".format(*paired(pooled, "esv3", "usc")), "",
+                "### Did USC actually select? (pooled)", "",
+                "USC names its pick in one tag. Where that tag cannot be resolved to a response, USC keeps the "
+                "initial answer and its accuracy becomes CoT maj@4's by construction - so this table has to be read "
+                "before any USC comparison.", "",
+                usc_health(per_model), ""]
+        out += [
                 "### The choice, on disagreeing instances only (pooled)", "", selection_table(pooled), "",
                 "### Stages 2-3 as a detector, per candidate (pooled)", "", candidate_table(pooled), "", check_table(pooled), "",
                 "### Decisions (pooled)", "", decision_table(pooled), "",

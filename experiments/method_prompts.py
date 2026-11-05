@@ -157,16 +157,28 @@ def build_v3_verify_prompt(instance: Dict[str, Any], solutions: List[Dict[str, s
     )
 
 
-USC_FIELDS = {"selected_response": "the number of the most consistent response"}
+def usc_fields(n: int = 4) -> Dict[str, str]:
+    """"the number OF the most consistent response" was read as "the number THAT IS the most consistent response":
+    solvers returned the answer value (35, 200, ...) instead of the response index, and usc_choice then had nothing
+    to select with. The label must name the range and rule the answer value out explicitly."""
+    return {"selected_response": f"ONE integer from 1 to {n}: the label of the response you select, "
+                                 f"NOT its answer value"}
+
+
+USC_FIELDS = usc_fields()
 
 
 def build_usc_prompt(instance: Dict[str, Any], responses: List[Dict[str, str]]) -> str:
-    """Universal Self-Consistency (Chen et al., 2023): all samples, duplicates included, and one selection."""
+    """Universal Self-Consistency: all samples, duplicates included, and one selection."""
+    n = len(responses)
     shown = "\n\n".join(f"Response {i}:\n<reasoning>{clipped(r['reasoning'])}</reasoning>\n"
                         f"<final_answer>{r['answer'] or '[no final answer]'}</final_answer>"
                         for i, r in enumerate(responses, start=1))
     return (
         "I have generated the following responses to the question below. Evaluate these responses. Select the most "
         "consistent response based on majority consensus.\n\n"
-        f"{problem_block(instance)}\n\n{shown}\n{TAG_RULES}\n\nOutput exactly this tag:\n{tag_block(USC_FIELDS)}"
+        f"{problem_block(instance)}\n\n{shown}\n{TAG_RULES}\n"
+        f"- Identify your selection by its Response LABEL, the integer 1-{n} printed above it. Do not write the "
+        f"answer itself: `<selected_response>2</selected_response>` means Response 2, not the answer 2.\n\n"
+        f"Output exactly this tag:\n{tag_block(usc_fields(n))}"
     )
