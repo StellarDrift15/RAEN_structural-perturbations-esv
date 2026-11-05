@@ -2,9 +2,8 @@
 """Stage-by-stage report for ESV v3 (run_esv3.py) -> results/analysis/esv3_report.md.
 
 Stage 1 needs only the CoT samples (records.json), so it is reported even before run_esv3.py has run. Stages 2-3 are
-reported from esv3_records.json; stored Experiment 3 methods (ESV v2, Recheck x3, Self-Refine) are added where
-open_records.json covers the same instances. Every comparison is paired on the same instances; fixes / breaks are vs
-CoT maj@4, the answer every method starts from.
+reported from esv3_records.json. Every comparison is paired on the same instances; fixes / breaks are vs CoT maj@4,
+the answer every method starts from.
 
   python experiments/analyze_esv3.py                    # current (large) solvers
   python experiments/analyze_esv3.py --limit-pairs 30   # stage 1 on the first 30 pairs only
@@ -19,20 +18,18 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from analyze import mcnemar_exact  # noqa: E402
 import common  # noqa: E402
 from common import (  # noqa: E402
-    SMALL_SOLVER_MODELS, SOLVER_MODELS, answers_match, majority_answer, model_slug, normalize_answer, score_answer,
+    SMALL_SOLVER_MODELS, SOLVER_MODELS, answers_match, majority_answer, mcnemar_exact, model_slug, normalize_answer,
+    score_answer,
 )
 from run_esv3 import DECISION_RULE, V3_VERSION, candidates_of, decide, is_sound, redecide  # noqa: E402
-from run_open import OPEN_VERSION, rescore  # noqa: E402
 
 MODEL_SETS = {"large": SOLVER_MODELS, "small": SMALL_SOLVER_MODELS}
 ARMS = ("original", "breaking", "preserving")
 # Fixed before the 30-pair dev run (2026-11-03): ESV v3 must beat CoT maj@4 by >= 3 pp AND beat USC.
 GO_MARGIN_PP = 3.0
 LABELS = {"dqa_maj": "Direct QA maj@4", "cot_pass1": "CoT pass@1", "cot_maj": "CoT maj@4 (initial)", "cot_pass4": "CoT pass@4 (oracle choice)",
-          "self_refine": "Self-Refine (Exp. 3)", "recheck3": "Recheck x3 (Exp. 3)", "esv": "ESV v2 (Exp. 3)",
           "usc": "Universal Self-Consistency", "esv3": "ESV v3 (stages 1-3)"}
 
 
@@ -86,7 +83,7 @@ def base_row(inst: Dict[str, Any], naive: Optional[str] = None) -> Dict[str, Any
     }
 
 
-def load(models, limit_pairs, v3_file: str = "esv3_records.json", min_pair=None):
+def load(models, limit_pairs, v3_file: str = "esv3_records.json", min_pair=None, max_pair=None):
     per_model: Dict[str, List[Dict[str, Any]]] = {}
     naive = naive_answers(json.loads(common.FROZEN_DATASET.read_text(encoding="utf-8")) if common.FROZEN_DATASET.exists() else {})
     for model in models:
@@ -98,15 +95,13 @@ def load(models, limit_pairs, v3_file: str = "esv3_records.json", min_pair=None)
         if (folder / v3_file).exists():
             v3 = {i: redecide(r) for i, r in json.loads((folder / v3_file).read_text(encoding="utf-8"))["instances"].items()
                   if r.get("version") == V3_VERSION}
-        opened = {}
-        if (folder / "open_records.json").exists():
-            opened = {i: rescore(r) for i, r in json.loads((folder / "open_records.json").read_text(encoding="utf-8"))["instances"].items()
-                      if r.get("version") == OPEN_VERSION}
         complete = [i for i, r in base.items() if all(s is not None for s in r["samples"]["cot"]) and all(s is not None for s in r["samples"]["dqa"])]
         ids = sorted(v3) if v3 else [i for i in complete if limit_pairs is None or int(base[i]["pair_id"]) < limit_pairs]
         ids = [i for i in ids if not common.is_disputed(i)]
         if min_pair is not None:
             ids = [i for i in ids if int(base[i]["pair_id"]) >= min_pair]
+        if max_pair is not None:
+            ids = [i for i in ids if int(base[i]["pair_id"]) < max_pair]
         rows = []
         for i in ids:
             row = base_row(base[i], naive.get(base[i]["pair_id"]))
@@ -116,14 +111,6 @@ def load(models, limit_pairs, v3_file: str = "esv3_records.json", min_pair=None)
                 row["correct"].update(esv3=bool(r["methods"]["esv3"]["final_correct"]), usc=bool(r["methods"]["usc"]["final_correct"]))
                 row["tokens"].update(esv3=tokens(r["methods"]["esv3"]["call"]), usc=tokens(r["methods"]["usc"]["call"]))
                 row["calls"].update(esv3=int(r["methods"]["esv3"]["call"] is not None), usc=int(r["methods"]["usc"]["call"] is not None))
-            if i in opened:
-                o = opened[i]
-                for k in ("esv", "recheck3", "self_refine"):
-                    row["correct"][k] = bool(o["methods"][k]["final_correct"])
-                stages = lambda k: [o["recognition"], *o["methods"][k]["stages"].values()] if k != "self_refine" else list(o["methods"][k]["stages"].values())
-                for k in ("esv", "recheck3", "self_refine"):
-                    row["tokens"][k] = sum(tokens(c) for c in stages(k))
-                    row["calls"][k] = sum(1 for c in stages(k) if c)
             rows.append(row)
         if rows:
             per_model[model] = rows
@@ -267,11 +254,13 @@ def main(argv: List[str] = None) -> int:
                         help="Read the esv3_records.<verifier>.json written by run_esv3.py --verifier-model")
     parser.add_argument("--min-pair", type=int, default=None,
                         help="Score only pairs >= this id (e.g. 60 = the held-out split; 0-59 is the dev set)")
+    parser.add_argument("--max-pair", type=int, default=None,
+                        help="Score only pairs < this id (e.g. --max-pair 60 = the dev split, pairs 0-59)")
     args = parser.parse_args(argv)
     common.select_benchmark(args.benchmark)
     vslug = model_slug(args.verifier_model) if args.verifier_model else None
     per_model = load(MODEL_SETS[args.models], args.limit_pairs, f"esv3_records.{vslug}.json" if vslug else "esv3_records.json",
-                     args.min_pair)
+                     args.min_pair, args.max_pair)
     if not per_model:
         print(f"No records.json for the {args.models} models.", file=sys.stderr)
         return 2
@@ -282,6 +271,8 @@ def main(argv: List[str] = None) -> int:
     verifier_note = f", verifier {args.verifier_model}" if args.verifier_model else ""
     if args.min_pair is not None:
         verifier_note += f", HELD-OUT pairs >= {args.min_pair}"
+    if args.max_pair is not None:
+        verifier_note += f", DEV pairs < {args.max_pair}"
     out = [f"# ESV v3, stage by stage ({common.benchmark_info()['label']}, {args.models} models{verifier_note})", "",
            f"Version `{V3_VERSION}`, decision rule `{DECISION_RULE}`. Gold is used only to score. Design and motivation: "
            "`esv_bottleneck_analysis.md`.", "",
@@ -316,6 +307,8 @@ def main(argv: List[str] = None) -> int:
         name = name[:-3] + f".{vslug}.md"
     if args.min_pair is not None:
         name = name[:-3] + f".from{args.min_pair}.md"
+    if args.max_pair is not None:
+        name = name[:-3] + f".upto{args.max_pair}.md"
     path = common.RESULTS_DIR / "analysis" / name
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(out), encoding="utf-8")

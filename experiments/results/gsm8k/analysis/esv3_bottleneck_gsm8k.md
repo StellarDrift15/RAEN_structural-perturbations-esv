@@ -1,7 +1,8 @@
 # Why ESV v3 fails on GSM8K: the bottleneck, layer by layer
 
 Dev set: pairs 0–59, small models (Qwen 2.5 7B, Mistral Nemo, Gemma 3 4B), 360 instances, 89 disagreeing.
-Records: `results/gsm8k/<model>/esv3_records.json`. Report: `esv3_report_small.md`. All numbers below are
+Records: `results/gsm8k/<model>/esv3_records.json`. Report: `esv3_report_small.upto60.md`
+(`analyze_esv3.py --benchmark gsm8k --models small --max-pair 60`). All numbers below are
 reproducible offline from the stored records (no API calls). Written 2026-11-04.
 
 ## Headline
@@ -133,7 +134,7 @@ tie-aware decision rule and the held-out pairs (60–197) are still clean for co
 91.5%). Selection on disagreeing instances: 72.1% vs the 76.7% oracle. Pooled: ESV v3 92.2% vs CoT maj@4
 87.7% (+4.5 pp, 16 fixes, 0 breaks, p<0.001); self-model USC was 88.5%. Breaking arm 77.8% -> 86.7%.
 The one_sound branch flipped from the liability (5/15 self) to the engine (16/0). Verdict-only and strict
-SOUND agree exactly; the rule did not need to change. Report: `esv3_report_small.gpt-oss-120b.md`.
+SOUND agree exactly; the rule did not need to change. Report: `esv3_report_small.gpt-oss-120b.upto60.md`.
 
 Confirms the layer-3 diagnosis: the bindings/MATCHES judgment was the bottleneck, and it is a capability
 + independence property of the checker, not of the protocol. Next: held-out confirmation (pairs 60-197)

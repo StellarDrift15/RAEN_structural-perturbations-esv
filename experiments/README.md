@@ -1,81 +1,81 @@
-# ESV experiments: Direct QA vs CoT vs ESV on structurally perturbed problems
+# ESV experiments: can a checker fix reasoning failures under structural perturbation?
 
 One code base, several benchmarks. Every script takes `--benchmark` (default `jeebench`) and reads / writes
 `data/<benchmark>/` and `results/<benchmark>/`.
 
-> **Folder name.** This folder was built as `jeebench_experiment/` and now holds every benchmark. Rename it to
-> `experiments/` (close VS Code first; the folder is locked while it is open) so the commands below work as written.
+## Where this stands
+
+**GSM8K is a GO.** ESV v3 with an *independent* checker (`openai/gpt-oss-120b`) verifying the solver's own
+competing candidate solutions beats CoT maj@4 by a wide margin on the held-out split, and beats the
+Universal Self-Consistency control:
+
+| method (3 small solvers pooled, held-out pairs 60-197, 813 instances) | accuracy | fixes / breaks vs CoT maj@4 | p |
+|---|---|---|---|
+| CoT maj@4 (baseline) | 88.8% | - | - |
+| Universal Self-Consistency | 89.7% | - | - |
+| ESV v3, **self**-check | 85.1% | 18 / 57 | worse |
+| **ESV v3, independent check (gpt-oss-120b)** | **94.1%** | **45 / 2** | **p < 1e-10** |
+| CoT pass@4 (oracle ceiling) | 95.1% | - | - |
+
+The whole result rests on *who* does the checking, not on the ESV stages: self-verification scores near
+chance (right candidates called SOUND 57% vs wrong 37%, LR 1.6), while gpt-oss-120b separates them cleanly
+(87% vs 2%, LR 47). The full diagnosis, every split and the per-arm breakdown are in
+**`results/gsm8k/analysis/esv3_bottleneck_gsm8k.md`** — read that first; it is the authoritative write-up.
+
+JEEBench was the dev benchmark and is **retired**: only 5-10% of the models' wrong answers were the "trap"
+answer a misapplied strategy produces, and half the failures were on untouched problems (base accuracy
+26-40%), which no checker can fix (`results/jeebench/analysis/esv_bottleneck_analysis.md`). Earlier
+JEEBench-only experiments (ESV v4 with an oracle trigger, ESV v2 + controls, gold-free ESV v2) all failed
+and their runners were removed; their reports are kept under `results/jeebench/analysis/` and their raw
+records are still in `results/jeebench/<model>/records.json` (the `esv`, `retry` and `extra` blocks). Recover the
+code from git history if it is ever needed.
 
 ## Benchmarks (`benchmarks.py`)
 
 | name | source | problems | answer formats | status |
 |---|---|---|---|---|
-| `jeebench` | JEE Advanced 2016-2023 math (pilot's `dataset.json`) | 236 -> 200 sampled -> 193 pairs | single / multiple MCQ, integer, numeric | dev benchmark, Experiments 1-3 and ESV v3 done |
-| `gsm8k` | `openai/gsm8k`, config main, test split (cached in `data/gsm8k/source.json`) | 1317 (2 negative answers dropped) -> 200 sampled | integer | source pulled; pairs not built yet |
+| `gsm8k` | `openai/gsm8k`, config main, test split (cached in `data/gsm8k/source.json`) | 1317 (2 negative answers dropped) -> 200 sampled -> 198 pairs | integer | **GO**, complete |
+| `jeebench` | JEE Advanced 2016-2023 math (pilot's `dataset.json`) | 236 -> 200 sampled -> 193 pairs | single / multiple MCQ, integer, numeric | retired dev benchmark |
 
-Why GSM8K next: on JEEBench only 5-10% of the models' wrong answers are the "trap" answer that a misapplied strategy
-produces; half the failures are on untouched problems (base accuracy 26-40%), which no strategy check can fix. On
-GSM8K these models solve ~90% of originals, so failures on perturbed problems should mostly be strategy failures,
-which is the case ESV is designed for (`results/jeebench/analysis/esv_bottleneck_analysis.md`).
+## Models
 
-## Solver models
+- **Solvers, small** (`common.SMALL_SOLVER_MODELS`): Qwen 2.5 7B, Mistral Nemo 12B, Gemma 3 4B — the GSM8K
+  result above.
+- **Solvers, large** (`common.SOLVER_MODELS`, the default): Qwen 2.5 72B, Mistral Small 3.2 24B, Llama 3.3 70B.
+  On GSM8K these are at 97% CoT maj@4 with only 7.5% of instances disagreeing, so there is little headroom.
+- **Checker:** `openai/gpt-oss-120b`, passed to `run_esv3.py --verifier-model`. Without that flag the solver
+  checks itself, which is the control that fails.
 
-- **Current (default):** Qwen 2.5 72B, Mistral Small 3.2 24B and Llama 3.3 70B (`common.SOLVER_MODELS`).
-- **Small:** Qwen 2.5 7B, Mistral Nemo 12B and Gemma 3 4B (`common.SMALL_SOLVER_MODELS`), which ran Experiments 1-3
-  on JEEBench.
+## The method: ESV v3
 
-## The experiments
+Starts from the 4 CoT samples already in `records.json`; it never re-solves.
 
-All use the same frozen pairs and the same 4 Direct QA + 4 CoT samples per instance (`run_methods.py`).
+1. **Disagreement gate** (no call): group the 4 CoT answers into distinct candidates. All agree -> keep the
+   CoT majority answer. Only disagreeing instances can change, so the checker runs on ~25% of instances.
+2. **Candidate verification** (one call, T = 0): for every distinct candidate solution, in order of first
+   appearance and *without* vote counts — the strategy, its bindings to the problem text (MATCHES /
+   MISMATCH), the method's conditions (HOLDS / VIOLATED), the divergence point, then SOUND or FLAWED with a
+   failure type (BINDING / METHOD / COMPUTATION), the first flawed step and the corrected fact.
+3. **Choice** (code, no call): a candidate counts as SOUND only if its verdict is SOUND *and* it lists no
+   MISMATCH and no VIOLATED. Exactly one SOUND -> choose it; several -> most votes; none -> keep the initial
+   answer (stage 4, diagnosis-driven repair, is not built).
 
-| | Where ESV runs | Gold answer used for | Code | Report (in `results/<benchmark>/analysis/`) |
-|---|---|---|---|---|
-| **1. ESV v4** (frozen) | only where all 4 CoT samples are wrong | the trigger and scoring | `run_methods.py` phases 1-2 | `analyze.py` -> `report.md` |
-| **2. ESV v2 + controls** | the same consistent failures | the trigger and scoring | `run_methods.py --extra-methods` | `compare_methods.py` -> `method_comparison.md` |
-| **3. Gold-free ESV v2** | every instance; blind recognition | scoring only | `run_open.py` | `analyze_open.py` -> `open_report_{large,small}.md` |
-| **ESV v3** (stages 1-3) | every instance where the 4 CoT samples disagree | scoring only | `run_esv3.py` | `analyze_esv3.py` -> `esv3_report.md` |
-
-Experiments 1-2 use an oracle trigger, so ESV can only gain there. Experiment 3 and ESV v3 are the like-for-like
-comparisons: every method starts from the CoT majority answer (CoT maj@4), decides on its own whether to change it,
-and can fix a wrong answer or break a right one.
-
-- **Experiment 3 methods:** ESV v2 (blind recognition -> diagnosis -> 3 strategies -> one solve each -> vote with the
-  initial answer); Recheck x3 (same recognition gate, 3 plain re-solves, same vote); Self-Refine (one review-and-correct
-  call).
-- **ESV v3:** no re-solving. Stage 1 keeps the answer when the 4 samples agree; one call verifies every distinct
-  candidate solution against the problem text (strategy, bindings MATCHES / MISMATCH, conditions, SOUND / FLAWED,
-  failure type, corrected fact); a candidate that is the only SOUND one is chosen. Control: Universal
-  Self-Consistency on the same samples. Stage 4 (diagnosis-driven repair) is not built.
-
-### JEEBench results so far (large models, 30 dev pairs = 180 instances)
-
-| Method | accuracy | fixes / breaks vs CoT maj@4 |
-|---|---|---|
-| CoT maj@4 | 40.0% | - |
-| Recheck x3 | 40.0% | 3 / 3 |
-| Self-Refine | 38.9% | 7 / 9 |
-| Universal Self-Consistency | 38.3% | 7 / 10 |
-| ESV v2 (gold-free) | 38.3% | 1 / 4 |
-| ESV v3 (stages 1-3) | 32.8% | 9 / 22 (p = 0.029) |
-
-Every self-check the same model performs (recognition, Self-Refine's verdict, the answer checks, the v3 candidate
-verdicts) scores near chance: the checker re-encodes the solver's confidence instead of adding information. See
-`esv_bottleneck_analysis.md` for the full diagnosis.
+The gold answer is used only to score, never in a decision — so the comparison against CoT maj@4 is fair:
+every method starts from the same answer and can fix a wrong one or break a right one. **Control:**
+Universal Self-Consistency (Chen et al., 2023) on the same samples and the same gate.
 
 ## Files
 
 | File | Role |
 |---|---|
-| `common.py` | benchmarks and paths, config (models, seeds, n = 4, temperature), OpenRouter client, tagged-output calls, type-aware scoring |
+| `common.py` | benchmarks and paths, config (models, seeds, n = 4, temperature), OpenRouter client, tagged-output calls, type-aware scoring, McNemar |
 | `benchmarks.py` | source problems per benchmark in one shape; pulls and caches GSM8K |
 | `perturb_prompts.py` | generator / verifier prompts for both perturbation modes, format-preserving |
 | `build_dataset.py` | sample 200, two-stage perturbation with the mode balancer -> `data/<benchmark>/frozen_dataset.json` |
-| `method_prompts.py` | every solver and judge prompt: DQA, CoT, ESV v4, ESV v2, controls, ESV v3, USC |
-| `run_methods.py` | 4 DQA + 4 CoT samples (`--samples-only`), then Experiments 1-2 |
-| `run_open.py` | Experiment 3 |
-| `run_esv3.py` | ESV v3 and Universal Self-Consistency |
-| `analyze.py`, `compare_methods.py`, `analyze_open.py`, `analyze_esv3.py` | the reports above |
-| `failure_analysis.py` | where ESV v4 loses (JEEBench, frozen Experiment 1 records) |
+| `method_prompts.py` | the Direct QA, CoT, ESV v3 and USC prompts |
+| `run_methods.py` | the 4 Direct QA + 4 CoT samples every method starts from |
+| `run_esv3.py` | ESV v3 and the USC control; `--verifier-model` for the independent checker |
+| `analyze_esv3.py` | the stage-by-stage report, the go / no-go line and every comparison table |
 | `tests/smoke_test_offline.py` | every step on both benchmarks against a fake model client, no API calls |
 
 ## Run order (from the repo root)
@@ -83,25 +83,35 @@ verdicts) scores near chance: the checker re-encodes the solver's confidence ins
 The OpenRouter key is read from `experiments/.env` (or `RAEN_ENV_FILE`). Every step resumes where it stopped.
 
 ```bash
-python experiments/tests/smoke_test_offline.py                      # 0. offline check, no API calls
+python experiments/tests/smoke_test_offline.py              # 0. offline check of every step, no API calls
 
-# GSM8K (next)
-python experiments/benchmarks.py gsm8k                              # pull / summarize the source (done, cached)
-python experiments/build_dataset.py --benchmark gsm8k --limit 10    # 1. small live check of the perturbation pipeline
-python experiments/build_dataset.py --benchmark gsm8k               #    all 200 problems
-python experiments/run_methods.py --benchmark gsm8k --samples-only --limit-pairs 30   # 2. 4 DQA + 4 CoT samples
-python experiments/analyze_esv3.py --benchmark gsm8k                #    stage 1: CoT maj@4 vs pass@4, trap rate
-python experiments/run_esv3.py --benchmark gsm8k --limit-pairs 30   # 3. ESV v3 + USC
-python experiments/run_open.py --benchmark gsm8k --limit-pairs 30   #    ESV v2 + controls (same instances)
-
-# JEEBench (all done; reports rebuild offline)
-python experiments/analyze.py; python experiments/compare_methods.py
-python experiments/analyze_open.py; python experiments/analyze_esv3.py
+B=gsm8k                                                     # or the next benchmark
+python experiments/benchmarks.py $B                          # 1. pull / summarize the source
+python experiments/build_dataset.py --benchmark $B --limit 10 # 2. small live check of the perturbation pipeline
+python experiments/build_dataset.py --benchmark $B           #    then all 200 problems
+python experiments/run_methods.py --benchmark $B --models <small solvers>   # 3. the 4 DQA + 4 CoT samples
+python experiments/analyze_esv3.py --benchmark $B --models small            #    stage 1 only: headroom + trap rate
+python experiments/run_esv3.py --benchmark $B --verifier-model openai/gpt-oss-120b --models <small solvers>
+python experiments/analyze_esv3.py --benchmark $B --models small --verifier-model openai/gpt-oss-120b
 ```
+
+Decide on stage 1 before spending on the checker: if the solvers' 4 CoT samples almost never disagree, or
+almost no disagreement is fixable (`disagreeing, fixable` in the stage-1 table), there is no headroom.
+
+**Split discipline.** Pairs 0-59 are the dev split and pairs >= 60 are held out. `analyze_esv3.py` takes
+`--max-pair 60` for the dev split and `--min-pair 60` for the held-out one; a report's file name records
+which (`.upto60`, `.from60`). Tune on dev only.
+
+Every report rebuilds offline from the stored records, with no API calls.
 
 ## Outputs
 
-- `data/<benchmark>/`: `sample_200.json`, `generation_log.jsonl` (every attempt), `frozen_dataset.json`; GSM8K also `source.json`
-- `results/<benchmark>/<model>/`: `records.json` (samples + Experiments 1-2), `open_records.json` (Experiment 3), `esv3_records.json`
-- `results/<benchmark>/analysis/`: the reports and figures
-- `results_frozen/jeebench/experiment1_esv_v4/`: the final Experiment 1 records (checksums in `SHA256SUMS`); never modified
+- `data/<benchmark>/`: `sample_200.json`, `generation_log.jsonl` (every attempt), `frozen_dataset.json`;
+  GSM8K also `source.json`
+- `results/<benchmark>/<model>/`: `records.json` (the 4 + 4 samples), `esv3_records.json` (self-check) and
+  `esv3_records.<verifier>.json` (independent check)
+- `results/<benchmark>/analysis/`: the reports
+
+The retired JEEBench experiments left extra keys on their records: `esv` / `retry` (Experiment 1, ESV v4) and
+`extra` (Experiment 2). No current script reads or writes them, and `run_methods.py --no-resume` would discard
+them, so treat git history as their archive.

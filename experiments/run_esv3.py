@@ -35,12 +35,11 @@ from typing import Any, Dict, List, Optional, Tuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
 from common import (  # noqa: E402
-    SOLVER_MODELS, answers_match, load_json, majority_answer, make_client, modal_index,
+    SOLVER_MODELS, answers_match, final_fields, load_json, majority_answer, make_client, modal_index,
     model_slug, reasoning_setting, save_json, score_answer, utc_now, verdict_value,
 )
 import method_prompts as mp  # noqa: E402
 import run_methods as rm  # noqa: E402
-from run_open import final_fields  # noqa: E402
 
 # Bump when a prompt or sampling setting changes: resume only reuses records of the same version.
 V3_VERSION = "jee_esv3_v1_2026-11-03"
@@ -195,7 +194,7 @@ def run_model(client, model: str, pairs: List[Dict[str, Any]], args) -> None:
             save_json(path, {"metadata": {**metadata, "saved_at": utc_now()}, "instances": {**untouched, **records}})
             last_save[0] = time.time()
 
-    runner = V3Runner(client, model, reasoning_setting(args.reasoning), None, None)
+    runner = V3Runner(client, model, reasoning_setting(args.reasoning))
     runner.verifier_model = args.verifier_model
     runner.verifier_reasoning = reasoning_setting(args.verifier_reasoning)
 

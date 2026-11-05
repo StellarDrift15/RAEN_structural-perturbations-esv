@@ -10,6 +10,7 @@ Differences from the pilot that matter for the results:
 """
 
 import json
+import math
 import os
 import re
 import sys
@@ -549,3 +550,21 @@ def modal_index(normalized: List[Optional[str]], answer_format: str) -> int:
 
 def answer_counts(normalized: List[Optional[str]]) -> Dict[str, int]:
     return dict(Counter(v if v is not None else "UNREADABLE" for v in normalized))
+
+
+# ---- Statistics and final-answer scoring -----------------------------------------------------------
+
+def mcnemar_exact(b: int, c: int) -> Optional[float]:
+    """Two-sided exact McNemar p-value from the discordant counts b and c."""
+    n = b + c
+    if n == 0:
+        return None
+    return min(1.0, 2 * sum(math.comb(n, i) for i in range(min(b, c) + 1)) / 2 ** n)
+
+
+def final_fields(gold: str, answer_format: str, initial: Dict[str, Any], final_answer: Optional[str]) -> Dict[str, Any]:
+    """Scores a final answer against gold, only here. An empty final answer keeps the initial one."""
+    final = final_answer if final_answer else initial["answer"]
+    score = score_answer(final, gold, answer_format)
+    return {"final_answer": final, "final_normalized": score["normalized_answer"], "final_correct": score["correct"],
+            "changed": not answers_match(score["normalized_answer"], initial["normalized"], answer_format)}

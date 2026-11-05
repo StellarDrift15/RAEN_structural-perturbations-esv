@@ -1,4 +1,4 @@
-# ESV v3, stage by stage (GSM8K, small models)
+# ESV v3, stage by stage (GSM8K, small models, verifier openai/gpt-oss-120b, DEV pairs < 60)
 
 Version `jee_esv3_v1_2026-11-03`, decision rule `stages1-3_strict_v1_2026-11-03`. Gold is used only to score. Design and motivation: `esv_bottleneck_analysis.md`.
 
@@ -34,7 +34,7 @@ ESV targets the *trap*: the answer the original strategy S yields when applied b
 
 ## Stages 2-3: candidate verification and choice
 
-**Go / no-go (fixed before the run): NO-GO.** ESV v3 - CoT maj@4 = -2.5 pp (needs >= +3); ESV v3 - USC = -3.4 pp (needs > 0).
+**Go / no-go (fixed before the run): GO.** ESV v3 - CoT maj@4 = +4.5 pp (needs >= +3); ESV v3 - USC = +4.5 pp (needs > 0).
 
 ### All instances
 
@@ -46,8 +46,8 @@ ESV targets the *trap*: the answer the original strategy S yields when applied b
 | CoT pass@1 | 91.2% |  |  |  |  |
 | CoT maj@4 (initial) | 92.4% |  |  |  |  |
 | CoT pass@4 (oracle choice) | 95.8% |  |  |  |  |
-| Universal Self-Consistency | 92.4% | 0 | 0 | +0 (p=-) | 2 / 0.15 |
-| ESV v3 (stages 1-3) | 91.6% | 2 | 3 | -1 (p=1.000) | 147 / 0.15 |
+| Universal Self-Consistency | 92.4% | 0 | 0 | +0 (p=-) | 0 / 0.00 |
+| ESV v3 (stages 1-3) | 95.8% | 4 | 0 | +4 (p=0.125) | 342 / 0.15 |
 
 **mistralai/mistral-nemo** (119 instances)
 
@@ -57,8 +57,8 @@ ESV targets the *trap*: the answer the original strategy S yields when applied b
 | CoT pass@1 | 78.2% |  |  |  |  |
 | CoT maj@4 (initial) | 82.4% |  |  |  |  |
 | CoT pass@4 (oracle choice) | 92.4% |  |  |  |  |
-| Universal Self-Consistency | 84.9% | 4 | 1 | +3 (p=0.375) | 4 / 0.38 |
-| ESV v3 (stages 1-3) | 77.3% | 3 | 9 | -6 (p=0.146) | 339 / 0.38 |
+| Universal Self-Consistency | 82.4% | 0 | 0 | +0 (p=-) | 0 / 0.00 |
+| ESV v3 (stages 1-3) | 90.8% | 10 | 0 | +10 (p=0.002) | 786 / 0.38 |
 
 **google/gemma-3-4b-it** (119 instances)
 
@@ -68,8 +68,8 @@ ESV targets the *trap*: the answer the original strategy S yields when applied b
 | CoT pass@1 | 85.7% |  |  |  |  |
 | CoT maj@4 (initial) | 88.2% |  |  |  |  |
 | CoT pass@4 (oracle choice) | 91.6% |  |  |  |  |
-| Universal Self-Consistency | 88.2% | 0 | 0 | +0 (p=-) | 4 / 0.19 |
-| ESV v3 (stages 1-3) | 86.6% | 1 | 3 | -2 (p=0.625) | 216 / 0.19 |
+| Universal Self-Consistency | 88.2% | 0 | 0 | +0 (p=-) | 0 / 0.00 |
+| ESV v3 (stages 1-3) | 89.9% | 2 | 0 | +2 (p=0.500) | 467 / 0.19 |
 
 **Pooled** (357 instances)
 
@@ -79,10 +79,10 @@ ESV targets the *trap*: the answer the original strategy S yields when applied b
 | CoT pass@1 | 85.0% |  |  |  |  |
 | CoT maj@4 (initial) | 87.7% |  |  |  |  |
 | CoT pass@4 (oracle choice) | 93.3% |  |  |  |  |
-| Universal Self-Consistency | 88.5% | 4 | 1 | +3 (p=0.375) | 3 / 0.24 |
-| ESV v3 (stages 1-3) | 85.2% | 6 | 15 | -9 (p=0.078) | 234 / 0.24 |
+| Universal Self-Consistency | 87.7% | 0 | 0 | +0 (p=-) | 0 / 0.00 |
+| ESV v3 (stages 1-3) | 92.2% | 16 | 0 | +16 (p=0.000) | 532 / 0.24 |
 
-ESV v3 vs USC (ESV-only / USC-only right, McNemar p): 6 / 18 (p=0.023)
+ESV v3 vs USC (ESV-only / USC-only right, McNemar p): 16 / 0 (p=0.000)
 
 ### The choice, on disagreeing instances only (pooled)
 
@@ -90,31 +90,30 @@ ESV v3 vs USC (ESV-only / USC-only right, McNemar p): 6 / 18 (p=0.023)
 |---|---|
 | majority vote (CoT maj@4) | 46/86 (53.5%) |
 | uniform random candidate (chance) | 28.2/86 (32.8%) |
-| Universal Self-Consistency | 49/86 (57.0%) |
-| ESV v3, strict SOUND (used) | 37/86 (43.0%) |
-| ESV v3, verdict-only SOUND (secondary) | 35/86 (40.7%) |
+| Universal Self-Consistency | 46/86 (53.5%) |
+| ESV v3, strict SOUND (used) | 62/86 (72.1%) |
+| ESV v3, verdict-only SOUND (secondary) | 62/86 (72.1%) |
 | oracle choice (CoT pass@4) | 66/86 (76.7%) |
 
 ### Stages 2-3 as a detector, per candidate (pooled)
 
 | SOUND rule | right candidates called SOUND | wrong candidates called SOUND | precision of SOUND |
 |---|---|---|---|
-| strict (used) | 38/66 (57.6%) | 57/162 (35.2%) | 40.0% |
-| verdict only | 40/66 (60.6%) | 60/162 (37.0%) | 40.0% |
+| strict (used) | 54/66 (81.8%) | 5/162 (3.1%) | 91.5% |
+| verdict only | 54/66 (81.8%) | 5/162 (3.1%) | 91.5% |
 
 |  | n | some binding MISMATCH | some condition VIOLATED | verdict unreadable | failure types when FLAWED |
 |---|---|---|---|---|---|
-| right candidates | 66 | 3/66 (4.5%) | 5/66 (7.6%) | 0/66 (0.0%) | BINDING: 11, METHOD: 7, COMPUTATION: 7, None: 1 |
-| wrong candidates | 162 | 23/162 (14.2%) | 27/162 (16.7%) | 0/162 (0.0%) | COMPUTATION: 38, METHOD: 32, BINDING: 27, None: 5 |
+| right candidates | 66 | 7/66 (10.6%) | 3/66 (4.5%) | 0/66 (0.0%) | BINDING: 9, COMPUTATION: 2, METHOD: 1 |
+| wrong candidates | 162 | 105/162 (64.8%) | 95/162 (58.6%) | 0/162 (0.0%) | BINDING: 90, COMPUTATION: 42, METHOD: 25 |
 
 ### Decisions (pooled)
 
 | decision | n | CoT maj@4 | ESV v3 | fixes | breaks | a candidate is right |
 |---|---|---|---|---|---|---|
 | unanimous | 271 | 98.5% | 98.5% | 0 | 0 | 267 |
-| one_sound | 61 | 62.3% | 45.9% | 5 | 15 | 49 |
-| several_sound | 16 | 25.0% | 31.2% | 1 | 0 | 11 |
-| none_sound | 9 | 44.4% | 44.4% | 0 | 0 | 6 |
+| one_sound | 59 | 64.4% | 91.5% | 16 | 0 | 55 |
+| none_sound | 27 | 29.6% | 29.6% | 0 | 0 | 11 |
 
 `none_sound` is where stage 4 would act; `a candidate is right` there is its ceiling.
 
@@ -122,6 +121,6 @@ ESV v3 vs USC (ESV-only / USC-only right, McNemar p): 6 / 18 (p=0.023)
 
 | arm | n | CoT maj@4 (initial) | Universal Self-Consistency | ESV v3 (stages 1-3) | ESV v3 fixes / breaks |
 |---|---|---|---|---|---|
-| original | 177 | 91.0% | 91.5% | 89.3% | 2 / 5 |
-| breaking | 90 | 77.8% | 77.8% | 72.2% | 3 / 8 |
-| preserving | 90 | 91.1% | 93.3% | 90.0% | 1 / 2 |
+| original | 177 | 91.0% | 91.0% | 93.2% | 4 / 0 |
+| breaking | 90 | 77.8% | 77.8% | 86.7% | 8 / 0 |
+| preserving | 90 | 91.1% | 91.1% | 95.6% | 4 / 0 |
