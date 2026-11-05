@@ -389,7 +389,7 @@ Retired runners (ESV v2 / v4, the retry controls, `analyze.py`) were removed fro
 @misc{raen_esv_2026,
   title        = {Explicit Strategy Verification: Recognizing and Repairing Invalid Reasoning
                   Strategies under Structural Perturbations},
-  author       = {{StellarDrift15}},
+  author       = {{Ekansh Agrawal, Ritvij Sharma, Anand Ramaswamy Jayshree}},
   year         = {2026},
   howpublished = {\url{https://github.com/StellarDrift15/RAEN_structural-perturbations-esv}},
   note         = {Research code and data; manuscript in preparation}
