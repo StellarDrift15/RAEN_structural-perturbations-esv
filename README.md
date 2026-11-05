@@ -2,7 +2,7 @@
 
 # Explicit Strategy Verification (ESV)
 
-### Robust mathematical & coding reasoning through error identification, diagnosis and recovery under structural perturbations
+### Recognizing and Repairing Invalid Reasoning Strategies under Structural Perturbations: A Gold-Free Verification Method that beats Majority Voting & Universal Self-Consistency (USC)
 
 *(RAEN — `RAEN_structural-perturbations-esv`)*
 
