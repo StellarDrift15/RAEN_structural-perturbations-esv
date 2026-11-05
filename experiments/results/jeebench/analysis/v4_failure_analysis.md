@@ -1,6 +1,6 @@
 # ESV v4 failure analysis (JEEBench dev set, Experiment 1)
 
-625 ESV runs on consistent failures (all 4 CoT samples wrong). Source: `results_frozen\jeebench\experiment1_esv_v4`.
+625 ESV runs on consistent failures (all 4 CoT samples wrong). Source: the `esv` blocks of `results/jeebench/<model>/records.json` (was `results_frozen/jeebench/experiment1_esv_v4`, since removed as a duplicate).
 
 ## 1. What happened on each failure
 
