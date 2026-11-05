@@ -2,11 +2,28 @@
 
 Version `jee_esv3_v1_2026-11-03`, decision rule `stages1-3_strict_v1_2026-11-03`. Gold is used only to score. Design and motivation: `esv_bottleneck_analysis.md`.
 
-| Stage | Status |
-|---|---|
-| 1. Disagreement gate | built, measured below |
-| 2-3. Candidate verification + choice | run, measured below |
-| 4. Diagnosis-driven repair | not built (decision `none_sound` keeps the initial answer) |
+## The pipeline, as run
+
+Every method starts from the same 4 CoT samples and none of them re-solves the problem; they differ only in how they pick among answers the solver already produced. ESV fires only on disagreement, so it can damage a correct majority as easily as repair a wrong one, and is scored that way.
+
+| # | Stage | What it does | Calls | Model called | Outcome |
+|---|---|---|---|---|---|
+| 0 | CoT sampling (shared input, not part of ESV) | The solver answers the problem 4 times with chain-of-thought. Produced once by `run_methods.py` and reused unchanged by every method, so nothing below ever re-solves the problem. | 4 per instance, T = 0.7, seeds 0-3 | solver | 4 answers. Their majority is the `initial` answer and is scored as the CoT maj@4 baseline. |
+| 1 | Disagreement gate | Group the 4 answers into distinct candidates by normalized value, in order of first appearance, keeping each one's vote count. Unreadable answers are dropped. | 0 (free) | none | Fewer than 2 distinct candidates -> decision `unanimous`: keep the initial answer and STOP. 2 or more -> go to stage 2. |
+| 2 | Contrastive verification | All distinct candidates in ONE call, one representative solution each, in order of first appearance, with vote counts hidden. Per candidate: the strategy, its bindings to quoted givens (MATCHES / MISMATCH), the conditions the method needs (HOLDS / VIOLATED), then the first divergence point, then SOUND or FLAWED with a failure type (BINDING / METHOD / COMPUTATION), the flawed step and the corrected fact. | 1 per disagreeing instance, T = 0 | the solver itself (self-verification) | A filled-in check per candidate (run, measured below). |
+| 3 | Decision rule (code only, no model) | A candidate is strictly SOUND only if its verdict is SOUND **and** it lists zero MISMATCH **and** zero VIOLATED. Exactly one such candidate wins; several, the one with the most votes (ties to the initial answer, then to the earliest); none, nothing is chosen. | 0 (free) | none | `one_sound` -> take that candidate. `several_sound` -> take the most-voted SOUND one. `none_sound` -> keep the initial answer. `unreadable` -> keep the initial answer. |
+| 4 | Diagnosis-driven repair | Would re-solve using the diagnosis from stage 2 where no candidate survives. NOT BUILT: `none_sound` simply keeps the initial answer, so ESV never invents an answer the solver did not already produce. | n/a | n/a | Not built. Its ceiling is the `a candidate is right` column of the decisions table below. |
+| 5 | Scoring | Gold enters here and nowhere else. Paired against CoT maj@4 on the same instances, with exact McNemar tests, so a stage can break a correct majority as easily as repair a wrong one. | 0 (free) | none | The accuracy tables below. |
+
+### Where USC sits (the baseline, not a stage)
+
+Universal Self-Consistency is the control ESV must beat, not a step inside it. It replaces stages 2-3 with a single selection call and is wired in deliberately parallel to them:
+
+- **When it fires:** on exactly the same instances as stage 2, the disagreeing ones (2 or more distinct readable candidates). A `unanimous` instance never calls it and keeps the majority answer, so USC and CoT maj@4 agree there by construction.
+- **Who is called:** the **solver**, never the verifier. USC has no verifier, which is why it is identical in both conditions. (Measured in this report.)
+- **What it sees:** all 4 samples including duplicates, in arbitrary order, with the reasoning shown. Unlike stage 2 it is therefore free to count multiplicity: it can see that 3 of 4 samples agree.
+- **How it answers:** one `<selected_response>` tag naming the response it picks. Resolved first as a response label (1-4), then as the selected answer's value, which solvers frequently return instead.
+- **When it declines:** a tag that resolves to neither keeps the initial answer, i.e. USC falls back to CoT maj@4. The rate is reported under *Did USC actually select?* and must be read before any USC comparison.
 
 Excluded from every score: 6 instances whose published gold is wrong or ambiguous (`common.DISPUTED_INSTANCES`): 105_original, 111_original, 189_original, 40_original, 82_original, 95_original.
 
@@ -46,7 +63,7 @@ ESV targets the *trap*: the answer the original strategy S yields when applied b
 | CoT pass@1 | 91.2% |  |  |  |  |
 | CoT maj@4 (initial) | 92.4% |  |  |  |  |
 | CoT pass@4 (oracle choice) | 95.8% |  |  |  |  |
-| Universal Self-Consistency | 92.4% | 0 | 0 | +0 (p=-) | 2 / 0.15 |
+| Universal Self-Consistency | 93.3% | 1 | 0 | +1 (p=1.000) | 2 / 0.15 |
 | ESV v3 (stages 1-3) | 91.6% | 2 | 3 | -1 (p=1.000) | 147 / 0.15 |
 
 **mistralai/mistral-nemo** (119 instances)
@@ -57,7 +74,7 @@ ESV targets the *trap*: the answer the original strategy S yields when applied b
 | CoT pass@1 | 78.2% |  |  |  |  |
 | CoT maj@4 (initial) | 82.4% |  |  |  |  |
 | CoT pass@4 (oracle choice) | 92.4% |  |  |  |  |
-| Universal Self-Consistency | 84.9% | 4 | 1 | +3 (p=0.375) | 4 / 0.38 |
+| Universal Self-Consistency | 84.0% | 4 | 2 | +2 (p=0.688) | 4 / 0.38 |
 | ESV v3 (stages 1-3) | 77.3% | 3 | 9 | -6 (p=0.146) | 339 / 0.38 |
 
 **google/gemma-3-4b-it** (119 instances)
@@ -79,10 +96,21 @@ ESV targets the *trap*: the answer the original strategy S yields when applied b
 | CoT pass@1 | 85.0% |  |  |  |  |
 | CoT maj@4 (initial) | 87.7% |  |  |  |  |
 | CoT pass@4 (oracle choice) | 93.3% |  |  |  |  |
-| Universal Self-Consistency | 88.5% | 4 | 1 | +3 (p=0.375) | 3 / 0.24 |
+| Universal Self-Consistency | 88.5% | 5 | 2 | +3 (p=0.453) | 3 / 0.24 |
 | ESV v3 (stages 1-3) | 85.2% | 6 | 15 | -9 (p=0.078) | 234 / 0.24 |
 
-ESV v3 vs USC (ESV-only / USC-only right, McNemar p): 6 / 18 (p=0.023)
+ESV v3 vs USC (ESV-only / USC-only right, McNemar p): 5 / 17 (p=0.017)
+
+### Did USC actually select? (pooled)
+
+USC names its pick in one tag. Where that tag cannot be resolved to a response, USC keeps the initial answer and its accuracy becomes CoT maj@4's by construction - so this table has to be read before any USC comparison.
+
+| model | USC calls | by response label | by answer value | ambiguous (label used) | unresolved -> keeps CoT maj@4 |
+|---|---|---|---|---|---|
+| qwen/qwen-2.5-7b-instruct | 18 | 9/18 (50.0%) | 9/18 (50.0%) | 0/18 (0.0%) | 0/18 (0.0%) |
+| mistralai/mistral-nemo | 45 | 36/45 (80.0%) | 8/45 (17.8%) | 1/45 (2.2%) | 0/45 (0.0%) |
+| google/gemma-3-4b-it | 23 | 16/23 (69.6%) | 4/23 (17.4%) | 0/23 (0.0%) | 3/23 (13.0%) |
+| **pooled** | 86 | 61/86 (70.9%) | 21/86 (24.4%) | 1/86 (1.2%) | 3/86 (3.5%) |
 
 ### The choice, on disagreeing instances only (pooled)
 

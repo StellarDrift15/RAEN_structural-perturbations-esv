@@ -12,7 +12,9 @@ Starts from the 4 CoT samples in results/<model>/records.json; no new samples. P
               VIOLATED. Exactly one SOUND -> choose it; several -> the one with most votes (then the initial answer);
               none -> stage 4, NOT BUILT YET: the initial answer is kept.
   usc         control, Universal Self-Consistency: the same disagreeing instances, all 4 samples (duplicates
-              included), one "select the most consistent response" call.
+              included), one "select the most consistent response" call. USC asks the SOLVER, not the verifier, so
+              it is run only in the self-verify condition; with --verifier-model its arm is marked `skipped` and left
+              unscored, and analyze_esv3.py reads it from esv3_records.json instead.
 The gold answer is used only to score the final answers and the candidates (for the report), never in a decision.
 
 Output: results/<model>/esv3_records.json. Report: analyze_esv3.py.
@@ -36,7 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
 from common import (  # noqa: E402
     SOLVER_MODELS, answers_match, final_fields, load_json, majority_answer, make_client, modal_index,
-    model_slug, reasoning_setting, save_json, score_answer, utc_now, verdict_value,
+    model_slug, normalize_answer, reasoning_setting, save_json, score_answer, utc_now, verdict_value,
 )
 import method_prompts as mp  # noqa: E402
 import run_methods as rm  # noqa: E402
@@ -103,10 +105,37 @@ def decide(candidates: List[Dict[str, Any]], checks: List[Dict[str, Any]], stric
     return "none_sound", None  # stage 4 (diagnosis-driven repair) is not built yet
 
 
-def usc_choice(call: Optional[Dict[str, Any]], cot: List[Dict[str, Any]]) -> Optional[int]:
-    match = re.search(r"\d+", ((call or {}).get("parsed") or {}).get("selected_response", ""))
+def usc_choice(call: Optional[Dict[str, Any]], cot: List[Dict[str, Any]],
+               answer_format: Optional[str] = None) -> Tuple[Optional[int], Optional[str]]:
+    """USC's selection, as (index, how). Solvers answer this tag two ways: with the response label (1..n) as asked,
+    or with the selected answer's VALUE ("35"), because the original tag label was ambiguous. A value identifies a
+    response just as unambiguously, so it is honoured and recorded as such rather than discarded.
+
+    how: "label" | "value" | "ambiguous" (reads as both a label and an answer value, and they disagree) |
+         "unresolved" (neither; USC made no usable selection and the caller falls back to the initial answer).
+    """
+    if not call:
+        return None, None
+    raw = (((call.get("parsed") or {}).get("selected_response")) or "").strip()
+    match = re.search(r"\d+", raw)
     index = int(match.group(0)) - 1 if match else -1
-    return index if 0 <= index < len(cot) else None
+    by_label = index if 0 <= index < len(cot) else None
+    by_value = None
+    if answer_format and raw:
+        picked = normalize_answer(raw, answer_format)
+        hits = [i for i, s in enumerate(cot) if s["normalized"] and picked
+                and answers_match(picked, s["normalized"], answer_format)]
+        # Several samples giving that answer is not ambiguity: they are the same selection.
+        if hits and all(answers_match(cot[i]["normalized"], cot[hits[0]]["normalized"], answer_format) for i in hits):
+            by_value = hits[0]
+    if by_label is None:
+        return (by_value, "value") if by_value is not None else (None, "unresolved")
+    if by_value is None or answers_match(cot[by_label]["normalized"], cot[by_value]["normalized"], answer_format):
+        return by_label, "label"
+    return by_label, "ambiguous"  # the tag asked for a label, so the label wins; reported separately
+
+
+USC_SKIPPED = "not run in this condition: USC is a solver-only control, measured in esv3_records.json"
 
 
 def redecide(record: Dict[str, Any]) -> Dict[str, Any]:
@@ -117,9 +146,20 @@ def redecide(record: Dict[str, Any]) -> Dict[str, Any]:
     e["decision"], e["chosen"] = decide(cands, e["checks"])
     e.update(final_fields(gold, fmt_, init, cands[e["chosen"]]["answer"] if e["chosen"] is not None else None))
     u = record["methods"]["usc"]
-    pick = usc_choice(u["call"], record["cot_answers"]) if u["call"] else None
-    u["chosen_sample"] = pick
-    u.update(final_fields(gold, fmt_, init, record["cot_answers"][pick]["answer"] if pick is not None else None))
+    # USC is a solver-only control: it shows the solver its own samples and has no verifier, so run_esv3.py runs it
+    # only in the self-verify condition. In an independent-verifier record the arm is ABSENT, which is not the same
+    # as "USC kept the initial answer" - scoring it as the initial answer would silently report CoT maj@4 as USC
+    # (the initial answer IS the modal sample). Disagreeing instances with no call in a verifier record are left
+    # unscored; unanimous ones keep the answer in every condition, so they stay scored.
+    if u.get("skipped") or (record.get("verifier_model") and u["call"] is None and len(cands) >= 2):
+        u["skipped"] = USC_SKIPPED
+        u.update(chosen_sample=None, final_answer=None, final_normalized=None, final_correct=None, changed=False)
+    else:
+        pick, how = usc_choice(u["call"], record["cot_answers"], fmt_)
+        u["chosen_sample"], u["selection"] = pick, how
+        # `unresolved` keeps the initial answer, which is USC's documented fallback - but it makes USC look exactly
+        # like CoT maj@4, so analyze_esv3.py reports the rate instead of letting it pass unseen.
+        u.update(final_fields(gold, fmt_, init, record["cot_answers"][pick]["answer"] if pick is not None else None))
     record["decision_rule"] = DECISION_RULE
     return record
 
@@ -164,7 +204,8 @@ class V3Runner(rm.Runner):
             "perturbation_type": inst["perturbation_type"], "answer_format": fmt_, "gold": inst["gold"],
             "model": self.model, "verifier_model": self.verifier_model, "version": V3_VERSION, "initial": initial, "candidates": cands,
             "cot_answers": [{"answer": s["answer"], "normalized": s["normalized_answer"]} for s in cot],
-            "methods": {"esv3": {"call": verify, "checks": checks}, "usc": {"call": usc}},
+            "methods": {"esv3": {"call": verify, "checks": checks},
+                        "usc": {"call": usc, **({"skipped": USC_SKIPPED} if self.verifier_model and len(cands) >= 2 else {})}},
         }
         return redecide(record)
 
