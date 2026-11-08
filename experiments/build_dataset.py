@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Builds the frozen (P, P') dataset of a benchmark: 200 random problems -> two-stage perturbation -> frozen pairs.
+"""Builds the frozen (P, P') dataset of a benchmark: n random problems -> two-stage perturbation -> frozen pairs.
 
 Stage 1  Model A (generator) writes P' in the assigned mode (strategy-breaking or strategy-preserving), keeping the
          original answer format. Cheap deterministic checks run before any verifier is called.
@@ -18,11 +18,15 @@ Balancing the two modes (roughly 50/50 accepted pairs)
 
 Progress is appended to data/generation_log.jsonl after every problem, so the run can be stopped and resumed.
 
+How many problems, and where they go, is per benchmark (common.BENCHMARKS): jeebench and gsm8k sample 200 into
+data/<benchmark>/sample_200.json, math500 samples 250 into data/math500/sample_250.json.
+
 Run (from the repo root):
   python experiments/build_dataset.py --limit 4 --workers 2   # small smoke test
-  python experiments/build_dataset.py                         # all 200 problems (resumes automatically)
+  python experiments/build_dataset.py                         # every sampled problem (resumes automatically)
   python experiments/build_dataset.py --freeze-only           # rebuild frozen_dataset.json from the log
   python experiments/build_dataset.py --benchmark gsm8k       # another benchmark (data/gsm8k/, results/gsm8k/)
+  python experiments/build_dataset.py --benchmark math500     # MATH-500: 250 problems, integer/numeric/expression
 """
 
 import argparse
@@ -43,7 +47,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common  # noqa: E402
 from benchmarks import load_source  # noqa: E402
 from common import (  # noqa: E402
-    GENERATOR_MODEL, NUM_ORIGINAL_PROBLEMS, SAMPLE_SEED, VERIFIER_MODELS, answer_format_of, answers_match, bool_value,
+    GENERATOR_MODEL, SAMPLE_SEED, VERIFIER_MODELS, answer_format_of, answers_match, bool_value,
     call_stage, is_choice_format, load_json, make_client, normalize_answer, provider_prefs, save_json, to_confidence, utc_now,
 )
 from perturb_prompts import (  # noqa: E402
@@ -53,7 +57,9 @@ from perturb_prompts import (  # noqa: E402
 
 
 def sample_path() -> Path:
-    return common.DATA_DIR / "sample_200.json"
+    """data/<benchmark>/sample_<n>.json, where n is the benchmark's sample size (common.BENCHMARKS): 200 for
+    jeebench and gsm8k, 250 for math500."""
+    return common.DATA_DIR / f"sample_{common.sample_size()}.json"
 
 
 def log_path() -> Path:
@@ -61,6 +67,8 @@ def log_path() -> Path:
 
 
 MODES = ("breaking", "preserving")
+# Optional per-problem fields a benchmark may supply; copied into the sample and the frozen pairs when present.
+EXTRA_PROBLEM_FIELDS = ("subject", "level")
 PIPELINE_VERSION = "jee_perturb_v1_2026-11-01"
 
 CONFIDENCE_THRESHOLD = 0.6
@@ -129,8 +137,10 @@ def clean_question(text: str) -> str:
     return str(text or "").strip().replace("\\mathrm{~mL}", " mL").replace("\\mathrm", "")
 
 
-def load_sample(n: int = NUM_ORIGINAL_PROBLEMS, seed: int = SAMPLE_SEED) -> List[Dict[str, Any]]:
-    """The fixed random sample of n math problems. Written once to data/sample_200.json and reused afterwards."""
+def load_sample(n: Optional[int] = None, seed: int = SAMPLE_SEED) -> List[Dict[str, Any]]:
+    """The fixed random sample of n math problems (n defaults to the benchmark's own sample size). Written once to
+    data/<benchmark>/sample_<n>.json and reused afterwards, so the sample never silently changes under a run."""
+    n = common.sample_size() if n is None else n
     saved = load_json(sample_path())
     if saved and saved.get("seed") == seed and saved.get("n") == n:
         return saved["problems"]
@@ -144,6 +154,9 @@ def load_sample(n: int = NUM_ORIGINAL_PROBLEMS, seed: int = SAMPLE_SEED) -> List
         "answer_format": answer_format_of(p["type"]),
         "question": clean_question(p["question"]),
         "gold": str(p["gold"]).strip(),
+        # Carried through to the frozen pairs where the benchmark provides them (MATH-500: subject and level), so a
+        # report can break results down by topic or difficulty without going back to source.json.
+        **{field: p[field] for field in EXTRA_PROBLEM_FIELDS if p.get(field) is not None},
     } for position, p in enumerate(chosen)]
     save_json(sample_path(), {"benchmark": common.BENCHMARK, "subject": common.benchmark_info()["subject"], "seed": seed,
                               "n": n, "pool_size": len(pool), "created_at": utc_now(), "problems": problems})
@@ -246,12 +259,20 @@ def options_unchanged(problem: str, perturbed: str) -> bool:
 
 
 def valid_answer(value: Optional[str], answer_format: str) -> bool:
+    """Whether a NORMALIZED answer has the shape its format requires. None (unreadable, or the NONE sentinel) never
+    does."""
     if value is None:
         return False
     if answer_format == "single":
         return len(value) == 1
     if answer_format == "integer":
         return re.fullmatch(r"\d+", value) is not None
+    if answer_format == "expression":
+        # normalize() already rejected the empty and NONE cases, and removed all whitespace. What is left to catch is
+        # a model writing a sentence or a derivation into the answer tag instead of the value. The bounds are set off
+        # the real data: the longest normalized MATH-500 gold is 34 characters and its longest run of letters is 7
+        # ("ellipse"), checked by tests/test_expression_answers.py, which asserts every gold passes this function.
+        return bool(value) and len(value) <= 120 and re.search(r"[A-Za-z]{12,}", value) is None
     return True
 
 
@@ -498,6 +519,7 @@ def freeze(problems: List[Dict[str, Any]], log: Dict[int, Dict[str, Any]]) -> Di
             "sample_position": problem["sample_position"],
             "type": problem["type"],
             "answer_format": problem["answer_format"],
+            **{field: problem[field] for field in EXTRA_PROBLEM_FIELDS if problem.get(field) is not None},
             "perturbation_type": row["mode"],
             "original_problem": problem["question"],
             "original_gold": problem["gold"],

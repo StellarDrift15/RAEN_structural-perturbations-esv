@@ -10,6 +10,7 @@ esv3_records.json: USC asks the solver, not the verifier, so run_esv3.py measure
 
   python experiments/analyze_esv3.py                    # current (large) solvers
   python experiments/analyze_esv3.py --limit-pairs 30   # stage 1 on the first 30 pairs only
+  python experiments/analyze_esv3.py --benchmark math500 --models small --verifier-model openai/gpt-oss-120b
 """
 
 import argparse
@@ -53,6 +54,26 @@ def tokens(call) -> int:
     return ((call or {}).get("usage") or {}).get("completion_tokens", 0)
 
 
+def call_cost(call) -> Dict[str, float]:
+    """One API call's billable size and wall-clock time, as recorded by common.call_stage. None = the call never ran."""
+    u = (call or {}).get("usage") or {}
+    return {"calls": 1 if call else 0, "prompt": u.get("prompt_tokens", 0), "completion": u.get("completion_tokens", 0),
+            "seconds": (call or {}).get("latency_seconds") or 0.0}
+
+
+def sample_cost(samples: List[Dict[str, Any]]) -> Dict[str, float]:
+    """A set of n independent samples. `serial` is the compute time (what a provider bills for); `path` is what a user
+    waits for, because run_methods.py issues the n samples concurrently, so only the slowest one is on the critical
+    path. Both are reported: serial is the throughput cost, path is the latency cost."""
+    parts = [call_cost(s) for s in samples]
+    return {"calls": len(parts), "prompt": sum(p["prompt"] for p in parts), "completion": sum(p["completion"] for p in parts),
+            "serial": sum(p["seconds"] for p in parts), "path": max((p["seconds"] for p in parts), default=0.0)}
+
+
+def scale(cost: Dict[str, float], factor: float) -> Dict[str, float]:
+    return {k: v * factor for k, v in cost.items()}
+
+
 def naive_answers(dataset: Dict[str, Any]) -> Dict[Any, Optional[str]]:
     """pair_id -> the trap answer of a breaking perturbation (what the original strategy S yields on P'), normalized."""
     out = {}
@@ -65,11 +86,29 @@ def naive_answers(dataset: Dict[str, Any]) -> Dict[Any, Optional[str]]:
     return out
 
 
+def method_cost(solver: Dict[str, float], extra: Optional[Dict[str, float]] = None,
+                extra_is_verifier: bool = False) -> Dict[str, float]:
+    """The compute a method spends on one instance: its share of the shared CoT/DQA samples plus at most one extra
+    call. The extra call is strictly sequential (it needs all 4 answers first), so it lands on the critical path in
+    full. Solver and verifier tokens are kept apart because under --verifier-model they are billed by different
+    models at different rates; `price_sensitivity` is what combines them."""
+    extra = extra or {"calls": 0, "prompt": 0, "completion": 0, "seconds": 0.0}
+    side = "verifier" if extra_is_verifier else "solver"
+    cost = {"calls": solver["calls"] + extra["calls"],
+            "solver": solver["prompt"] + solver["completion"], "verifier": 0.0,
+            "solver_completion": solver["completion"], "verifier_completion": 0.0,
+            "serial": solver["serial"] + extra["seconds"], "path": solver["path"] + extra["seconds"]}
+    cost[side] += extra["prompt"] + extra["completion"]
+    cost[side + "_completion"] += extra["completion"]
+    return cost
+
+
 def base_row(inst: Dict[str, Any], naive: Optional[str] = None) -> Dict[str, Any]:
     fmt_, gold = inst["answer_format"], inst["gold"]
     cot, dqa = inst["samples"]["cot"], inst["samples"]["dqa"]
     norm = [s["normalized_answer"] for s in cot]
     maj = majority_answer(norm, fmt_)
+    cot_cost, dqa_cost = sample_cost(cot), sample_cost(dqa)
     arm = "original" if inst["problem_type"] == "original" else inst["perturbation_type"]
     trap = naive is not None and arm == "breaking" and inst["problem_type"] == "perturbed"
     return {
@@ -83,6 +122,9 @@ def base_row(inst: Dict[str, Any], naive: Optional[str] = None) -> Dict[str, Any
                     "cot_pass4": any(s["correct"] for s in cot)},
         "tokens": {"cot4": sum(tokens(s) for s in cot)},
         "calls": {},
+        # CoT pass@1 is one of the 4 samples, so it costs a quarter of the shared block on average.
+        "cost": {"dqa_maj": method_cost(dqa_cost), "cot_maj": method_cost(cot_cost), "cot_pass4": method_cost(cot_cost),
+                 "cot_pass1": method_cost({**scale(cot_cost, 0.25), "path": cot_cost["serial"] / 4})},
     }
 
 
@@ -133,6 +175,13 @@ def load(models, limit_pairs, v3_file: str = "esv3_records.json", min_pair=None,
                 row["correct"].update(esv3=bool(r["methods"]["esv3"]["final_correct"]), usc=bool(u["final_correct"]))
                 row["tokens"].update(esv3=tokens(r["methods"]["esv3"]["call"]), usc=tokens(u["call"]))
                 row["calls"].update(esv3=int(r["methods"]["esv3"]["call"] is not None), usc=int(u["call"] is not None))
+                # Both arms reuse the same 4 CoT samples and add at most one call. USC always asks the solver; the
+                # ESV check asks whichever model run_esv3.py recorded, which is a different one under --verifier-model.
+                echeck = r["methods"]["esv3"]["call"]
+                row["cost"].update(
+                    esv3=method_cost(sample_cost(base[i]["samples"]["cot"]), call_cost(echeck),
+                                     extra_is_verifier=bool(echeck) and echeck.get("model") != model),
+                    usc=method_cost(sample_cost(base[i]["samples"]["cot"]), call_cost(u["call"])))
             rows.append(row)
         if rows:
             per_model[model] = rows
@@ -175,7 +224,9 @@ def paired(rows, a, b):
     wins = sum(r["correct"][a] and not r["correct"][b] for r in rows)
     losses = sum(r["correct"][b] and not r["correct"][a] for r in rows)
     p = mcnemar_exact(wins, losses)
-    return wins, losses, "-" if p is None else f"{p:.3f}"
+    if p is None:
+        return wins, losses, "-"
+    return wins, losses, f"{p:.3f}" if p >= 0.001 else (f"{p:.0e}" if p > 0 else "<1e-300")
 
 
 def accuracy_table(rows: List[Dict[str, Any]]) -> str:
@@ -192,7 +243,10 @@ def accuracy_table(rows: List[Dict[str, Any]]) -> str:
         tok = round(statistics.mean(r["tokens"][key] for r in rows)) if key in rows[0]["tokens"] else ""
         calls = f"{statistics.mean(r['calls'][key] for r in rows):.2f}" if key in rows[0]["calls"] else ""
         out.append([label, acc, fixes, breaks, f"{fixes - breaks:+d} (p={p})", f"{tok} / {calls}" if tok != "" else ""])
-    return table(["Method", "accuracy", "fixes", "breaks", "net vs CoT maj@4", "extra tokens / calls per instance"], out)
+    # Completion tokens only, for continuity with the earlier reports; the "Compute cost" section below bills the
+    # prompt side too and splits solver from verifier tokens.
+    return table(["Method", "accuracy", "fixes", "breaks", "net vs CoT maj@4",
+                  "extra completion tokens / calls per instance"], out)
 
 
 def candidate_table(rows: List[Dict[str, Any]]) -> str:
@@ -341,6 +395,152 @@ def breakdown(rows: List[Dict[str, Any]], keys) -> str:
     return table(["arm", "n"] + [LABELS[k] for k in keys] + ["ESV v3 fixes / breaks"], out)
 
 
+def format_breakdown(rows: List[Dict[str, Any]], keys) -> str:
+    """The same comparison split by answer format. Only meaningful where a benchmark mixes formats: MATH-500 has
+    integer, numeric and expression golds, and `expression` is the one scored by LaTeX / symbolic equivalence rather
+    than exact match, so if it were systematically harder for every method this is where that shows up."""
+    formats = sorted({r["format"] for r in rows})
+    if len(formats) < 2:
+        return ""
+    out = []
+    for fmt_ in formats:
+        sub = [r for r in rows if r["format"] == fmt_]
+        fixes, breaks, _ = paired(sub, "esv3", "cot_maj") if "esv3" in keys else (0, 0, "-")
+        out.append([fmt_, len(sub)] + [rate(sum(r["correct"][k] for r in sub), len(sub)) for k in keys]
+                   + [f"{fixes} / {breaks}" if "esv3" in keys else ""])
+    return table(["answer format", "n"] + [LABELS[k] for k in keys] + ["ESV v3 fixes / breaks"], out)
+
+
+# ---------------------------------------------------------------------------
+# Compute cost. Every number below is read from the `usage` and `latency_seconds` that common.call_stage stored on
+# each call, so the whole section is reproducible offline from the records with no API calls.
+# ---------------------------------------------------------------------------
+COST_METHODS = ("dqa_maj", "cot_pass1", "cot_maj", "usc", "esv3", "cot_pass4")
+
+
+def mean_cost(rows: List[Dict[str, Any]], key: str) -> Optional[Dict[str, float]]:
+    have = [r["cost"][key] for r in rows if key in r["cost"]]
+    if len(have) != len(rows) or not have:
+        return None
+    return {k: statistics.mean(c[k] for c in have) for k in have[0]}
+
+
+def total(cost: Dict[str, float]) -> float:
+    return cost["solver"] + cost["verifier"]
+
+
+def compute_table(rows: List[Dict[str, Any]]) -> str:
+    """What each method spends per instance. `serial` is billed compute time; `critical path` is what a user waits
+    for, given that the 4 samples are issued concurrently and the extra call cannot start until all 4 are back."""
+    base = mean_cost(rows, "cot_maj")
+    out = []
+    for key in COST_METHODS:
+        cost = mean_cost(rows, key)
+        if cost is None:
+            continue
+        acc = rate(sum(r["correct"][key] for r in rows), len(rows))
+        vs = f"{100 * (total(cost) - total(base)) / total(base):+.1f}%" if total(base) else "-"
+        out.append([LABELS[key], acc, f"{cost['calls']:.2f}", f"{cost['solver']:,.0f}",
+                    f"{cost['verifier']:,.0f}" if cost["verifier"] else "-", f"{total(cost):,.0f}", vs,
+                    f"{cost['serial']:.1f}", f"{cost['path']:.1f}"])
+    return table(["Method", "accuracy", "calls", "solver tokens", "verifier tokens", "total tokens",
+                  "vs CoT maj@4", "serial s", "critical path s"], out)
+
+
+def tradeoff_table(rows: List[Dict[str, Any]]) -> str:
+    """Accuracy bought per unit of extra compute, against the baseline every method starts from. `net` is
+    fixes - breaks, so a method that trades one correct answer for one wrong one is charged for both."""
+    base, n = mean_cost(rows, "cot_maj"), len(rows)
+    base_acc = 100 * sum(r["correct"]["cot_maj"] for r in rows) / n
+    out = []
+    for key in COST_METHODS:
+        cost = mean_cost(rows, key)
+        if cost is None or key in ("cot_maj", "cot_pass1"):
+            continue
+        fixes, breaks, p = paired(rows, key, "cot_maj")
+        net = fixes - breaks
+        extra_tok, extra_path = total(cost) - total(base), cost["path"] - base["path"]
+        delta = 100 * sum(r["correct"][key] for r in rows) / n - base_acc
+        per_fix = f"{extra_tok * n / net:,.0f}" if net > 0 and extra_tok > 0 else ("0" if net > 0 else "no net gain")
+        out.append([LABELS[key], f"{delta:+.1f} pp", f"{fixes} / {breaks}", f"{net:+d}", f"p={p}",
+                    f"{extra_tok:+,.0f}", f"{extra_path:+.1f} s", per_fix])
+    return table(["Method", "accuracy vs CoT maj@4", "fixes / breaks", "net", "McNemar",
+                  "extra tokens / instance", "extra wait", "extra tokens per net fix"], out)
+
+
+def gate_economics(rows: List[Dict[str, Any]]) -> str:
+    """The disagreement gate is the whole efficiency story: it is free (code only) and it retires most instances
+    before any verification call is paid for."""
+    fired = [r for r in rows if r["calls"].get("esv3")]
+    if not fired:
+        return ""
+    def extra(sub, field):
+        return statistics.mean(r["cost"]["esv3"][field] - r["cost"]["cot_maj"][field] for r in sub)
+
+    fired_tok = extra(fired, "solver") + extra(fired, "verifier")
+    amort_tok = extra(rows, "solver") + extra(rows, "verifier")
+    return table(["", "per instance"], [
+        ["Instances where the gate fires (>= 2 distinct candidates)", pct(len(fired), len(rows))],
+        ["A verification call, on an instance that fires", f"{fired_tok:,.0f} tokens, {extra(fired, 'path'):.1f} s"],
+        ["Amortized over every instance (what ESV actually costs)", f"{amort_tok:,.0f} tokens, {extra(rows, 'path'):.1f} s"],
+        ["The same protocol ungated, verifying every instance", f"{fired_tok:,.0f} tokens, {extra(fired, 'path'):.1f} s"],
+        ["Verification spend the gate avoids", f"{100 * (1 - len(fired) / len(rows)):.1f}%"],
+        ["Cost on a gated-out instance", "0 tokens, 0 s - ESV returns the CoT maj@4 answer untouched"]])
+
+
+def arm_compute(rows: List[Dict[str, Any]]) -> str:
+    """Compute per arm. The gate spends where the perturbation actually hurts, so this is the table that ties the
+    cost profile back to the dataset design."""
+    if not any("esv3" in r["cost"] for r in rows):
+        return ""
+    out = []
+    for arm in ARMS:
+        sub = [r for r in rows if r["arm"] == arm]
+        if not sub:
+            continue
+        base, esv = mean_cost(sub, "cot_maj"), mean_cost(sub, "esv3")
+        out.append([arm, len(sub), pct(sum(r["calls"].get("esv3", 0) for r in sub), len(sub)),
+                    rate(sum(r["correct"]["cot_maj"] for r in sub), len(sub)),
+                    rate(sum(r["correct"]["esv3"] for r in sub), len(sub)),
+                    f"{total(base):,.0f}", f"{total(esv) - total(base):+,.0f}",
+                    f"{100 * (total(esv) - total(base)) / total(base):+.1f}%"])
+    return table(["arm", "instances", "gate fires", "CoT maj@4", "ESV v3", "baseline tokens",
+                  "extra tokens", "vs baseline"], out)
+
+
+def price_sensitivity(rows: List[Dict[str, Any]], verifier_model: Optional[str]) -> List[str]:
+    """Under --verifier-model the extra call is billed by a different, larger model, so a raw token count understates
+    it. k = the verifier's price per token divided by the solver's; costs are quoted in solver-token equivalents.
+    Plug the providers' list prices into k - this report does not assume any."""
+    esv, base = mean_cost(rows, "esv3"), mean_cost(rows, "cot_maj")
+    usc = mean_cost(rows, "usc")
+    if esv is None or not esv["verifier"]:
+        return []
+    n = len(rows)
+    net_esv = sum(r["correct"]["esv3"] and not r["correct"]["cot_maj"] for r in rows) - \
+        sum(r["correct"]["cot_maj"] and not r["correct"]["esv3"] for r in rows)
+    net_usc = sum(r["correct"]["usc"] and not r["correct"]["cot_maj"] for r in rows) - \
+        sum(r["correct"]["cot_maj"] and not r["correct"]["usc"] for r in rows)
+    usc_extra = total(usc) - total(base)
+    rowsout = []
+    for k in (1, 2, 5, 10, 20):
+        tot = esv["solver"] + k * esv["verifier"]
+        rowsout.append([k, f"{tot:,.0f}", f"{100 * (tot - total(base)) / total(base):+.1f}%",
+                        f"{k * esv['verifier'] / usc_extra:.1f}x" if usc_extra else "-",
+                        f"{k * esv['verifier'] * n / net_esv:,.0f}" if net_esv > 0 else "-"])
+    out = [f"The ESV check is billed by {verifier_model}, the 4 samples by the solver, so a flat token count "
+           "understates the check. k = the verifier's price per token over the solver's; totals are in "
+           "solver-token equivalents. No price list is assumed - read off the row for your k.", "",
+           table(["k", "ESV tokens / instance", "vs CoT maj@4", "check vs USC's overhead", "per net fix"], rowsout), ""]
+    if net_esv > 0 and net_usc > 0 and usc_extra:
+        breakeven = (usc_extra * n / net_usc) / (esv["verifier"] * n / net_esv)
+        out += [f"Break-even against USC: ESV v3 costs less per net fix than USC for any k below "
+                f"**{breakeven:.1f}**. Above it USC is the cheaper way to buy a fix - but USC's total gain is capped "
+                f"at {net_usc:+d} net fixes against ESV's {net_esv:+d}, so the two are not interchangeable at any "
+                "price: more USC cannot reach ESV's accuracy.", ""]
+    return out
+
+
 def go_no_go(rows: List[Dict[str, Any]]) -> str:
     n = len(rows)
     d_maj = 100 * (sum(r["correct"]["esv3"] for r in rows) - sum(r["correct"]["cot_maj"] for r in rows)) / n
@@ -414,6 +614,32 @@ def main(argv: List[str] = None) -> int:
                 "### Decisions (pooled)", "", decision_table(pooled), "",
                 "`none_sound` is where stage 4 would act; `a candidate is right` there is its ceiling.", "",
                 "### By arm (pooled)", "", breakdown(pooled, ("cot_maj", "usc", "esv3")), ""]
+        out += ["## Compute cost", "",
+                "Read off the `usage` and `latency_seconds` stored on every call, so this section is reproducible "
+                "offline from the records. Every method starts from the same 4 CoT samples and adds at most one "
+                "call, so the baseline is shared and only the extra call separates them. **serial** is billed "
+                "compute time; **critical path** is what a user waits for, since `run_methods.py` issues the 4 "
+                "samples concurrently while the extra call cannot start until all 4 are back.", "",
+                compute_table(pooled), "",
+                "### What the extra compute buys (pooled)", "",
+                tradeoff_table(pooled), "",
+                "### The disagreement gate is the efficiency mechanism (pooled)", "",
+                "Stage 1 costs nothing - it is code over answers the solver already produced - and it is what keeps "
+                "ESV under 1.5x the baseline despite a verification call that is itself larger than a CoT sample.", "",
+                gate_economics(pooled), ""]
+        by_arm_cost = arm_compute(pooled)
+        if by_arm_cost:
+            out += ["### Compute by arm (pooled)", "",
+                    "The gate fires where the perturbation actually hurts, so ESV spends most on the strategy-breaking "
+                    "arm - which is also where it gains most. The cost profile is adaptive, not flat.", "",
+                    by_arm_cost, ""]
+        out += price_sensitivity(pooled, args.verifier_model or "the solver itself")
+        by_format = format_breakdown(pooled, ("cot_maj", "usc", "esv3"))
+        if by_format:
+            out += ["### By answer format (pooled)", "",
+                    "`expression` answers are compared by LaTeX normalization and symbolic equivalence "
+                    "(`expression_answers.py`) rather than by exact match, so this split is the check that the "
+                    "scoring is not what separates the methods.", "", by_format, ""]
     name = "esv3_report.md" if args.models == "large" else f"esv3_report_{args.models}.md"
     if vslug:
         name = name[:-3] + f".{vslug}.md"

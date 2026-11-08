@@ -7,7 +7,11 @@ reproducible offline from the stored records (no API calls). Written 2026-11-04.
 
 ## Headline
 
-| Method | accuracy | fixes | breaks | extra tokens/instance |
+Dev-split snapshot of the original NO-GO finding. `extra tokens/instance` here counts **completion tokens
+only**, as the early reports did; the full bill, prompt side included and solver separated from verifier
+tokens, is in "Compute cost" below.
+
+| Method | accuracy | fixes | breaks | extra completion tokens/instance |
 |---|---|---|---|---|
 | CoT maj@4 (baseline) | 87.7% | — | — | — |
 | ESV v3 (stages 1–3) | 85.2% | 6 | 15 | 234 |
@@ -15,7 +19,8 @@ reproducible offline from the stored records (no API calls). Written 2026-11-04.
 | CoT pass@4 (oracle ceiling) | 93.3% | — | — | — |
 
 NO-GO under the pre-registered rule (≥ +3 pp over CoT maj@4 AND > USC). ESV v3 is significantly worse
-than USC (McNemar 6/18, p = 0.023) at ~78× the token cost.
+than USC (McNemar 6/18, p = 0.023) at ~78× the extra completion tokens (1.9× counting the whole
+bill: +34.6% vs +18.7% over the baseline).
 
 ## What the benchmark switch DID fix
 
@@ -181,5 +186,137 @@ By arm (all 198): originals 90.6 -> 94.4 (23/1), breaking P' 79.1 -> 87.5 (25/0)
 Detector, all 198: self-check right-SOUND 57.0% vs wrong-SOUND 36.5% (LR 1.6, precision 44.8%); gpt-oss-120b
 86.7% vs 1.8% (LR 47.5, precision 96.1%).
 
-Deck: `presentation/ESV_Project_Proposal_v3.pptx` (14 slides) carries these numbers plus the pipeline, the
-verification-call internals and the pair-131 worked example.
+## Compute cost (2026-11-08)
+
+Every number here is read off the `usage` and `latency_seconds` that `common.call_stage` stored on each call —
+3,168 solver calls per model, plus 303 verification calls and 303 USC calls in all — so the whole section
+reproduces offline with no API calls:
+`analyze_esv3.py --benchmark gsm8k --models small [--verifier-model openai/gpt-oss-120b]`, section
+"Compute cost".
+
+The comparison is unusually clean because **no method re-solves the problem**. All four share the same 4 CoT
+samples and add at most one call, so the baseline is a constant and the extra call is the entire difference.
+
+### Per instance, pooled over the three solvers (all 198 pairs, 1,170 instances)
+
+`serial` is billed compute time. `critical path` is what a user waits for: `run_methods.py` issues the 4 samples
+concurrently, so only the slowest is on the path, and the extra call cannot start until all 4 are back.
+
+| method | accuracy | calls | solver tok | verifier tok | total tok | vs maj@4 | serial | path |
+|---|---|---|---|---|---|---|---|---|
+| Direct QA maj@4 | 12.1% | 4.00 | 1,095 | - | 1,095 | -54.0% | 2.4 s | 1.0 s |
+| CoT pass@1 | 85.1% | 1.00 | 595 | - | 595 | -75.0% | 4.8 s | 4.8 s |
+| CoT maj@4 (baseline) | 88.5% | 4.00 | 2,379 | - | 2,379 | - | 19.2 s | 6.5 s |
+| Universal Self-Consistency | 89.3% | 4.26 | 2,799 | - | 2,799 | +17.6% | 19.4 s | 6.7 s |
+| ESV, self-check | 85.1% | 4.26 | 3,158 | - | 3,158 | +32.7% | 23.5 s | 10.8 s |
+| **ESV, independent check** | **93.5%** | **4.26** | **2,379** | **1,038** | **3,417** | **+43.6%** | **26.4 s** | **13.7 s** |
+| CoT pass@4 (oracle ceiling) | 94.5% | 4.00 | 2,379 | - | 2,379 | - | 19.2 s | 6.5 s |
+
+The headline: **ESV buys +5.0 pp for +43.6% tokens and +0.26 calls** — not the 2x or 5x that a
+"verify every answer" pipeline would cost. Three facts do that work.
+
+### 1. What the extra compute buys
+
+`net` = fixes - breaks, so a method that trades a correct answer for a wrong one is charged for both.
+
+| method | Δ accuracy | fixes / breaks | net | extra tok | extra wait | tok per net fix |
+|---|---|---|---|---|---|---|
+| Direct QA maj@4 | -76.3 pp | 7 / 900 | -893 | -1,284 | -5.5 s | no net gain |
+| Universal Self-Consistency | +0.9 pp | 19 / 9 | +10 | +420 | +0.2 s | 49,112 |
+| ESV, self-check | -3.3 pp | 18 / 57 | -39 | +779 | +4.3 s | no net gain |
+| **ESV, independent check** | **+5.0 pp** | **61 / 2** | **+59** | **+1,038** | **+7.2 s** | **20,585** |
+| CoT pass@4 (oracle ceiling) | +6.1 pp | 71 / 0 | +71 | 0 | 0 s | 0 |
+
+ESV-independent costs 2.5x USC's token overhead and returns 5.9x the net fixes, so it is **2.4x more
+token-efficient per net fix than USC** (20.6k vs 49.1k). The self-check arm is strictly dominated: it pays
++779 tokens and +4.3 s to lose 3.3 pp, which is the cost side of the layer-3 diagnosis above.
+
+The oracle row is the useful framing for the compute angle: the right answer is *already in the 4 samples we
+paid for* 94.5% of the time. ESV is not buying reasoning, it is buying selection — which is why its cost is a
+fraction of the baseline rather than a multiple of it.
+
+### 2. The disagreement gate is the efficiency mechanism
+
+Stage 1 is code over answers already paid for, so it costs nothing and retires three-quarters of the work.
+
+| | per instance |
+|---|---|
+| Gate fires (>= 2 distinct candidates) | 303/1170 (25.9%) |
+| A verification call, when it runs | 4,008 tokens, 27.8 s |
+| Amortized over every instance | 1,038 tokens, 7.2 s |
+| The same protocol ungated | 4,008 tokens, 27.8 s |
+| **Verification spend the gate avoids** | **74.1%** |
+| Cost on a gated-out instance | 0 tokens, 0 s — ESV returns the maj@4 answer untouched |
+
+A fired verification call is large: 4,008 tokens, bigger than all 4 CoT samples put together. Ungated, ESV
+would cost +168% instead of +43.6%, and no accuracy would be gained — a unanimous instance has one candidate,
+so there is nothing to choose between.
+
+### 3. The spend is adaptive, and tracks where the gain is
+
+| arm | instances | gate fires | maj@4 | ESV | baseline tok | extra tok | vs baseline |
+|---|---|---|---|---|---|---|---|
+| originals | 576 | 20.3% | 90.6% | 94.4% | 2,279 | +757 | +33.2% |
+| **strategy-breaking P'** | 297 | **45.1%** | 79.1% | 87.5% | 2,764 | **+2,009** | **+72.7%** |
+| preserving P' | 297 | 17.5% | 93.6% | 97.6% | 2,188 | +612 | +28.0% |
+
+Disagreement is a free proxy for "the strategy may have broken": the gate fires 2.6x more often on breaking P'
+than on preserving P', which is exactly where the accuracy gap is. The same pattern holds per solver — and the
+cost of a *fix* stays nearly constant while total spend scales to how much repair the solver needs:
+
+| solver | gate fires | baseline tok | ESV tok | vs baseline | net fixes | tok per net fix |
+|---|---|---|---|---|---|---|
+| Qwen 2.5 7B | 18.7% | 2,025 | 2,761 | +36.3% | +14 | 20,500 |
+| Mistral Nemo 12B | 41.8% | 1,958 | 3,512 | +79.4% | +33 | 18,363 |
+| Gemma 3 4B | 17.2% | 3,153 | 3,978 | +26.1% | +12 | 26,793 |
+
+Nemo disagrees with itself most, pays the most (+79%) and gains the most (+8.4 pp). Nobody pays for headroom
+they do not have.
+
+### Splits
+
+| method | dev (357) | held-out (813) | all (1,170) |
+|---|---|---|---|
+| CoT maj@4 | 2,446 tok / 6.7 s | 2,349 tok / 6.4 s | 2,379 tok / 6.5 s |
+| USC | +18.7% / 6.9 s | +17.1% / 6.6 s | +17.6% / 6.7 s |
+| ESV, self-check | +34.6% / 11.0 s | +31.9% / 10.7 s | +32.7% / 10.8 s |
+| ESV, independent check | +44.8% / 12.7 s | +43.1% / 14.2 s | +43.6% / 13.7 s |
+
+The cost profile is stable across splits, so the held-out accuracy gain did not come with a cost surprise.
+
+### The honest caveat: the verifier is a bigger model
+
+The 1,038 verifier tokens are billed by gpt-oss-120b while the 2,379 solver tokens are billed by a 4-12B
+model, so a flat token count understates the check. With k = the verifier's price per token over the solver's,
+in solver-token equivalents:
+
+| k | ESV tok / instance | vs maj@4 | check vs USC's overhead | per net fix |
+|---|---|---|---|---|
+| 1 | 3,417 | +43.6% | 2.5x | 20,585 |
+| 2 | 4,455 | +87.3% | 4.9x | 41,170 |
+| 5 | 7,569 | +218.2% | 12.4x | 102,925 |
+| 10 | 12,759 | +436.4% | 24.7x | 205,849 |
+
+**Break-even against USC is k = 2.4.** Below it ESV is the cheaper way to buy a fix; above it USC is. But the
+two are not interchangeable at any price: USC's total gain is capped at +10 net fixes against ESV's +59, so
+more USC cannot reach 93.5%. The right way to read the table is that ESV buys accuracy USC cannot, and the
+price of that accuracy is set by k — plug in the providers' list prices; this report assumes none.
+
+Two latency facts belong in the paper next to this. The extra call is **strictly sequential** (it needs all 4
+answers), so it lands on the critical path in full: 6.5 s -> 13.7 s, a 2.1x wait, and 34.3 s on the 25.9% of
+instances where it actually fires. And `cot_pass1` is the real efficiency frontier for anyone who cares about
+latency over accuracy: 595 tokens and 4.8 s for 85.1%, i.e. 90% of ESV's accuracy for 17% of its tokens.
+
+### Open compute questions
+
+1. **The size control is also a cost control.** The pending judge-select and same-size cross-verifier controls
+   decide whether the +43.6% has to be spent on a 120B model. A same-size independent verifier would put k near
+   1 and make ESV unambiguously cheaper per fix than USC.
+2. **Not yet measured: spending the same tokens on more samples.** CoT maj@8 costs about +100% tokens; ESV
+   costs +43.6%. The oracle ceiling rises slowly with n, so the comparison probably favours ESV, but it is a
+   reviewer's first question and it is not in the records.
+3. **The verification call is not optimized.** 4,008 tokens per fire, of which ~2,000 are completion, for a
+   form of 4n+1 tags. Nothing has been tried to shorten it, so the +43.6% is an upper bound on this design.
+
+Deck: `presentation/ESV_Project_Proposal_v3.pptx` (16 slides) carries these numbers plus the pipeline, the
+verification-call internals, the pair-131 worked example and the two compute slides built from this section.

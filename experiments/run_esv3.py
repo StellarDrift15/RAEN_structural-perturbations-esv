@@ -23,6 +23,7 @@ Run (from the repo root):
   python experiments/run_esv3.py --limit-pairs 30      # dev pilot, the three current solvers
   python experiments/run_esv3.py --limit-pairs 60 --verifier-model openai/gpt-oss-120b   # independent-verifier test
                                                        # (writes esv3_records.<verifier>.json next to the self-verify file)
+  python experiments/run_esv3.py --benchmark math500 --verifier-model openai/gpt-oss-120b --models <small solvers>
 """
 
 import argparse
@@ -174,7 +175,7 @@ class V3Runner(rm.Runner):
         if not self.verifier_model:
             return self.solver("esv3_verify", prompt, fields, required)
         call = rm.call_stage(self.client, self.verifier_model, "esv3_verify", prompt, fields, required,
-                             self.verifier_reasoning, rm.SOLVER_MAX_TOKENS)
+                             self.verifier_reasoning, common.solver_max_tokens())
         if rm.is_api_failure(call):
             raise rm.ApiFailure(f"esv3_verify[{self.verifier_model}]: {call['errors'][-1] if call['errors'] else 'api error'}")
         return call

@@ -59,9 +59,9 @@ ESV targets the *trap*: the answer the original strategy S yields when applied b
 
 **qwen/qwen-2.5-7b-instruct** (271 instances)
 
-| Method | accuracy | fixes | breaks | net vs CoT maj@4 | extra tokens / calls per instance |
+| Method | accuracy | fixes | breaks | net vs CoT maj@4 | extra completion tokens / calls per instance |
 |---|---|---|---|---|---|
-| Direct QA maj@4 | 18.1% | 3 | 199 | -196 (p=0.000) |  |
+| Direct QA maj@4 | 18.1% | 3 | 199 | -196 (p=4e-55) |  |
 | CoT pass@1 | 87.6% |  |  |  |  |
 | CoT maj@4 (initial) | 90.4% |  |  |  |  |
 | CoT pass@4 (oracle choice) | 94.5% |  |  |  |  |
@@ -70,20 +70,20 @@ ESV targets the *trap*: the answer the original strategy S yields when applied b
 
 **mistralai/mistral-nemo** (271 instances)
 
-| Method | accuracy | fixes | breaks | net vs CoT maj@4 | extra tokens / calls per instance |
+| Method | accuracy | fixes | breaks | net vs CoT maj@4 | extra completion tokens / calls per instance |
 |---|---|---|---|---|---|
-| Direct QA maj@4 | 9.6% | 2 | 207 | -205 (p=0.000) |  |
+| Direct QA maj@4 | 9.6% | 2 | 207 | -205 (p=5e-59) |  |
 | CoT pass@1 | 78.9% |  |  |  |  |
 | CoT maj@4 (initial) | 85.2% |  |  |  |  |
 | CoT pass@4 (oracle choice) | 95.2% |  |  |  |  |
 | Universal Self-Consistency | 86.7% | 7 | 3 | +4 (p=0.344) | 5 / 0.44 |
-| ESV v3 (stages 1-3) | 93.7% | 25 | 2 | +23 (p=0.000) | 840 / 0.44 |
+| ESV v3 (stages 1-3) | 93.7% | 25 | 2 | +23 (p=6e-06) | 840 / 0.44 |
 
 **google/gemma-3-4b-it** (271 instances)
 
-| Method | accuracy | fixes | breaks | net vs CoT maj@4 | extra tokens / calls per instance |
+| Method | accuracy | fixes | breaks | net vs CoT maj@4 | extra completion tokens / calls per instance |
 |---|---|---|---|---|---|
-| Direct QA maj@4 | 6.6% | 1 | 229 | -228 (p=0.000) |  |
+| Direct QA maj@4 | 6.6% | 1 | 229 | -228 (p=3e-67) |  |
 | CoT pass@1 | 89.1% |  |  |  |  |
 | CoT maj@4 (initial) | 90.8% |  |  |  |  |
 | CoT pass@4 (oracle choice) | 95.6% |  |  |  |  |
@@ -92,16 +92,16 @@ ESV targets the *trap*: the answer the original strategy S yields when applied b
 
 **Pooled** (813 instances)
 
-| Method | accuracy | fixes | breaks | net vs CoT maj@4 | extra tokens / calls per instance |
+| Method | accuracy | fixes | breaks | net vs CoT maj@4 | extra completion tokens / calls per instance |
 |---|---|---|---|---|---|
-| Direct QA maj@4 | 11.4% | 6 | 635 | -629 (p=0.000) |  |
+| Direct QA maj@4 | 11.4% | 6 | 635 | -629 (p=2e-179) |  |
 | CoT pass@1 | 85.2% |  |  |  |  |
 | CoT maj@4 (initial) | 88.8% |  |  |  |  |
 | CoT pass@4 (oracle choice) | 95.1% |  |  |  |  |
 | Universal Self-Consistency | 89.7% | 14 | 7 | +7 (p=0.189) | 3 / 0.27 |
-| ESV v3 (stages 1-3) | 94.1% | 45 | 2 | +43 (p=0.000) | 521 / 0.27 |
+| ESV v3 (stages 1-3) | 94.1% | 45 | 2 | +43 (p=2e-11) | 521 / 0.27 |
 
-ESV v3 vs USC (ESV-only / USC-only right, McNemar p): 40 / 4 (p=0.000)
+ESV v3 vs USC (ESV-only / USC-only right, McNemar p): 40 / 4 (p=2e-08)
 
 ### Did USC actually select? (pooled)
 
@@ -154,3 +154,60 @@ USC names its pick in one tag. Where that tag cannot be resolved to a response, 
 | original | 399 | 90.5% | 91.5% | 95.0% | 19 / 1 |
 | breaking | 207 | 79.7% | 80.7% | 87.9% | 17 / 0 |
 | preserving | 207 | 94.7% | 95.2% | 98.6% | 9 / 1 |
+
+## Compute cost
+
+Read off the `usage` and `latency_seconds` stored on every call, so this section is reproducible offline from the records. Every method starts from the same 4 CoT samples and adds at most one call, so the baseline is shared and only the extra call separates them. **serial** is billed compute time; **critical path** is what a user waits for, since `run_methods.py` issues the 4 samples concurrently while the extra call cannot start until all 4 are back.
+
+| Method | accuracy | calls | solver tokens | verifier tokens | total tokens | vs CoT maj@4 | serial s | critical path s |
+|---|---|---|---|---|---|---|---|---|
+| Direct QA maj@4 | 11.4% | 4.00 | 1,071 | - | 1,071 | -54.4% | 2.1 | 0.8 |
+| CoT pass@1 | 85.2% | 1.00 | 587 | - | 587 | -75.0% | 4.8 | 4.8 |
+| CoT maj@4 (initial) | 88.8% | 4.00 | 2,349 | - | 2,349 | +0.0% | 19.2 | 6.4 |
+| Universal Self-Consistency | 89.7% | 4.27 | 2,752 | - | 2,752 | +17.1% | 19.4 | 6.6 |
+| ESV v3 (stages 1-3) | 94.1% | 4.27 | 2,349 | 1,013 | 3,362 | +43.1% | 27.0 | 14.2 |
+| CoT pass@4 (oracle choice) | 95.1% | 4.00 | 2,349 | - | 2,349 | +0.0% | 19.2 | 6.4 |
+
+### What the extra compute buys (pooled)
+
+| Method | accuracy vs CoT maj@4 | fixes / breaks | net | McNemar | extra tokens / instance | extra wait | extra tokens per net fix |
+|---|---|---|---|---|---|---|---|
+| Direct QA maj@4 | -77.4 pp | 6 / 635 | -629 | p=2e-179 | -1,278 | -5.7 s | no net gain |
+| Universal Self-Consistency | +0.9 pp | 14 / 7 | +7 | p=0.189 | +403 | +0.2 s | 46,796 |
+| ESV v3 (stages 1-3) | +5.3 pp | 45 / 2 | +43 | p=2e-11 | +1,013 | +7.8 s | 19,148 |
+| CoT pass@4 (oracle choice) | +6.3 pp | 51 / 0 | +51 | p=9e-16 | +0 | +0.0 s | 0 |
+
+### The disagreement gate is the efficiency mechanism (pooled)
+
+Stage 1 costs nothing - it is code over answers the solver already produced - and it is what keeps ESV under 1.5x the baseline despite a verification call that is itself larger than a CoT sample.
+
+|  | per instance |
+|---|---|
+| Instances where the gate fires (>= 2 distinct candidates) | 217/813 (26.7%) |
+| A verification call, on an instance that fires | 3,794 tokens, 29.0 s |
+| Amortized over every instance (what ESV actually costs) | 1,013 tokens, 7.8 s |
+| The same protocol ungated, verifying every instance | 3,794 tokens, 29.0 s |
+| Verification spend the gate avoids | 73.3% |
+| Cost on a gated-out instance | 0 tokens, 0 s - ESV returns the CoT maj@4 answer untouched |
+
+### Compute by arm (pooled)
+
+The gate fires where the perturbation actually hurts, so ESV spends most on the strategy-breaking arm - which is also where it gains most. The cost profile is adaptive, not flat.
+
+| arm | instances | gate fires | CoT maj@4 | ESV v3 | baseline tokens | extra tokens | vs baseline |
+|---|---|---|---|---|---|---|---|
+| original | 399 | 86/399 (21.6%) | 90.5% | 95.0% | 2,265 | +770 | +34.0% |
+| breaking | 207 | 93/207 (44.9%) | 79.7% | 87.9% | 2,697 | +1,879 | +69.7% |
+| preserving | 207 | 38/207 (18.4%) | 94.7% | 98.6% | 2,164 | +614 | +28.3% |
+
+The ESV check is billed by openai/gpt-oss-120b, the 4 samples by the solver, so a flat token count understates the check. k = the verifier's price per token over the solver's; totals are in solver-token equivalents. No price list is assumed - read off the row for your k.
+
+| k | ESV tokens / instance | vs CoT maj@4 | check vs USC's overhead | per net fix |
+|---|---|---|---|---|
+| 1 | 3,362 | +43.1% | 2.5x | 19,148 |
+| 2 | 4,375 | +86.2% | 5.0x | 38,296 |
+| 5 | 7,413 | +215.5% | 12.6x | 95,739 |
+| 10 | 12,477 | +431.1% | 25.1x | 191,478 |
+| 20 | 22,604 | +862.1% | 50.3x | 382,956 |
+
+Break-even against USC: ESV v3 costs less per net fix than USC for any k below **2.4**. Above it USC is the cheaper way to buy a fix - but USC's total gain is capped at +7 net fixes against ESV's +43, so the two are not interchangeable at any price: more USC cannot reach ESV's accuracy.

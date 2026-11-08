@@ -4,13 +4,22 @@ Two perturbation modes, balanced roughly 50/50 by build_dataset.py:
   breaking    applying the original strategy S unchanged to P' gives a wrong answer or cannot be completed
   preserving  P' is a genuinely new instance (the answer changes and must be recomputed), but S still works unchanged
 
-P' keeps the original's answer format (single-correct MCQ, multiple-correct MCQ, integer, numeric). The pilot turned
-every P' into a 4-option MCQ, which made original vs perturbed accuracy not like-for-like.
+P' keeps the original's answer format (single-correct MCQ, multiple-correct MCQ, integer, numeric, or - on MATH-500 -
+an exact LaTeX expression). The pilot turned every P' into a 4-option MCQ, which made original vs perturbed accuracy
+not like-for-like.
 
 Verification is split into two independent calls, as in the pilot:
   1. generate_prompt_solve    -> sees ONLY P' (no original problem, no strategy) -> avoids anchoring
   2. generate_prompt_strategy -> sees P, P', S and the solved answer -> mechanically applies S
 """
+
+# What the <answer_prime> / <naive_answer> tag placeholders say, per answer format. The wording for the four older
+# formats is unchanged, so JEEBench and GSM8K prompts stay byte-identical to the frozen runs.
+ANSWER_TAG_HINT = {"single": "option letters", "multiple": "option letters", "integer": "number", "numeric": "number",
+                   "expression": "LaTeX value"}
+SOLVE_TARGET = {"single": "select the correct option(s)", "multiple": "select the correct option(s)",
+                "integer": "give the final numerical answer", "numeric": "give the final numerical answer",
+                "expression": "give the final exact answer"}
 
 A_FIELDS = [
     "status", "P_prime", "option_A", "option_B", "option_C", "option_D",
@@ -49,6 +58,11 @@ FORMAT_RULES_A = {
     "numeric": r"""
     Answer format of P' (same as the original): the answer is a single number, with NO options. Leave all four option tags empty. If the answer is not an integer, the question must ask for it correct to two decimal places.
     - answer_prime and naive_answer must each be just the number (e.g. 2.25), rounded to two decimal places if not an integer. Never put letters or words there.""",
+    "expression": r"""
+    Answer format of P' (same as the original): the answer is a single exact mathematical value written in LaTeX, with NO options. Leave all four option tags empty.
+    - answer_prime and naive_answer must each contain ONLY the value itself, in LaTeX with single backslashes: a number, fraction, radical, multiple of pi, coordinate tuple, interval, set, vector, polynomial or a single word. No words of explanation, no units, no "=" and no surrounding sentence.
+    - Keep the SAME kind of answer as the original problem: a fraction stays an exact fraction, a radical stays an exact radical, a coordinate tuple stays a tuple of the same length, an interval stays an interval. Give the value in simplest exact form and never as a decimal approximation of an exact value (write \frac{14}{3}, not 4.67).
+    - Choose the change so that the answer of P' is still a single, well-defined value of that kind.""",
 }
 
 SOLVE_RULES = {
@@ -68,6 +82,10 @@ SOLVE_RULES = {
     Additional rules:
     - answer_prime must be just the number, rounded to two decimal places if not an integer (e.g. 2.25), or the single word NONE.
     - If the answer is not a single well-defined number, or the question is ambiguous or ill-posed, set answer_prime to NONE and valid_problem to false.""",
+    "expression": r"""
+    Additional rules:
+    - answer_prime must be just the final value in LaTeX, in simplest exact form and nothing else (e.g. \frac{14}{3}, 3\sqrt{13}, \frac{\pi}{2}, (6,31,-1), (-\infty,2)\cup(3,\infty), x^2-4x+1), or the single word NONE. No units, no "=" and no explanation. Never give a decimal approximation of an exact value.
+    - If the answer is not a single well-defined value, or the question is ambiguous or ill-posed, set answer_prime to NONE and valid_problem to false.""",
 }
 SOLVE_RULES_COMMON = """
     - valid_problem is false only if the question is ambiguous, ill-posed or has no correct answer of the required form."""
@@ -77,6 +95,7 @@ STRATEGY_ANSWER_RULE = {
     "multiple": "naive_answer must contain ONLY capital letters of the options S yields, in alphabetical order (e.g. B or ACD), or NONE if S cannot be carried out.",
     "integer": "naive_answer must be just the integer S yields, or NONE if S cannot be carried out.",
     "numeric": "naive_answer must be just the number S yields (two decimal places if not an integer), or NONE if S cannot be carried out.",
+    "expression": r"naive_answer must be just the value S yields, in LaTeX in simplest exact form (e.g. \frac{14}{3}, 3\sqrt{13}, (6,31,-1)) and nothing else, or NONE if S cannot be carried out.",
 }
 
 BREAKING_TASK = """
@@ -139,17 +158,16 @@ def generate_prompt_a(problem: str, answer: str, mode: str, answer_format: str, 
     <failure_reason>...</failure_reason>
     <alternative_strategy>...</alternative_strategy>
     <derivation>...</derivation>
-    <naive_answer>{'option letters' if choice else 'number'}</naive_answer>
-    <answer_prime>{'option letters' if choice else 'number'}</answer_prime>
+    <naive_answer>{ANSWER_TAG_HINT[answer_format]}</naive_answer>
+    <answer_prime>{ANSWER_TAG_HINT[answer_format]}</answer_prime>
     <confidence_level>number between 0 and 1</confidence_level>
     """
 
 
 def generate_prompt_solve(problem_perturbed: str, answer_format: str) -> str:
     """Independent solve of P' only (Models B and C). Never sees P, the strategy or the mode."""
-    target = "select the correct option(s)" if answer_format in ("single", "multiple") else "give the final numerical answer"
     return f"""
-    Solve this math problem independently by any valid method and {target}.
+    Solve this math problem independently by any valid method and {SOLVE_TARGET[answer_format]}.
 
     Problem: {problem_perturbed}
     {COMMON_RULES}{SOLVE_RULES[answer_format]}{SOLVE_RULES_COMMON}
@@ -157,7 +175,7 @@ def generate_prompt_solve(problem_perturbed: str, answer_format: str) -> str:
     <valid_problem>true or false</valid_problem>
     <reason>...</reason>
     <derivation>...</derivation>
-    <answer_prime>{'option letters' if answer_format in ('single', 'multiple') else 'number'} or NONE</answer_prime>
+    <answer_prime>{ANSWER_TAG_HINT[answer_format]} or NONE</answer_prime>
     <confidence_level>number between 0 and 1</confidence_level>
     """
 
@@ -188,5 +206,5 @@ def generate_prompt_strategy(problem: str, problem_perturbed: str, strategy: str
     Output exactly this tagged format and nothing else:
     <strategy_status>INVALID or INSUFFICIENT or STILL_VALID or UNCERTAIN</strategy_status>
     <strategy_reason>...</strategy_reason>
-    <naive_answer>{'option letters' if answer_format in ('single', 'multiple') else 'number'} or NONE</naive_answer>
+    <naive_answer>{ANSWER_TAG_HINT[answer_format]} or NONE</naive_answer>
     """
