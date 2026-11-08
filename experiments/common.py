@@ -23,6 +23,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # every entry point does this too; repeated for safety
+import expression_answers  # noqa: E402  the `expression` answer format (MATH-500); imports nothing from this module
+
 # Windows consoles default to cp1252; never let a stray symbol in a model answer crash a run.
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(errors="replace")
@@ -39,11 +42,20 @@ RESULTS_ROOT = Path(os.getenv("ESV_RESULTS_DIR", EXPERIMENT_DIR / "results"))
 # (default: ESV_BENCHMARK or jeebench) and calls select_benchmark() first, so paths are read through the module
 # (common.DATA_DIR, common.RESULTS_DIR, common.FROZEN_DATASET), never imported by name: `from common import
 # RESULTS_DIR` would freeze the default benchmark's path at import time.
-BENCHMARKS: Dict[str, Dict[str, str]] = {
-    "jeebench": {"label": "JEEBench (math)", "subject": "math",
+# Per-benchmark settings:
+#   n                  how many original problems build_dataset.py samples, and so which sample_<n>.json it writes.
+#                      Per benchmark because MATH-500 is sampled at 250 while the two older benchmarks were frozen at
+#                      200; changing a benchmark's n would orphan its sample file and invalidate its frozen pairs.
+#   solver_max_tokens  the reply cap for the solvers and the ESV checker (default SOLVER_MAX_TOKENS). MATH-500 gets
+#                      more room: its problems are competition-level, and a reply cut off by the cap costs a second,
+#                      doubled-cap call (call_stage) that is paid for on top of the wasted one.
+BENCHMARKS: Dict[str, Dict[str, Any]] = {
+    "jeebench": {"label": "JEEBench (math)", "subject": "math", "n": 200,
                  "source": "pilot_experiment/src/dataset.json (JEE Advanced 2016-2023, math subset)"},
-    "gsm8k": {"label": "GSM8K", "subject": "grade-school math",
+    "gsm8k": {"label": "GSM8K", "subject": "grade-school math", "n": 200,
               "source": "openai/gsm8k on Hugging Face, config main, test split, cached in data/gsm8k/source.json"},
+    "math500": {"label": "MATH-500", "subject": "competition math", "n": 250, "solver_max_tokens": 6000,
+                "source": "HuggingFaceH4/MATH-500 on Hugging Face, test split, cached in data/math500/source.json"},
 }
 BENCHMARK = os.getenv("ESV_BENCHMARK", "jeebench")
 DATA_DIR = RESULTS_DIR = FROZEN_DATASET = Path()
@@ -59,8 +71,18 @@ def select_benchmark(name: str) -> None:
     FROZEN_DATASET = DATA_DIR / "frozen_dataset.json"
 
 
-def benchmark_info() -> Dict[str, str]:
+def benchmark_info() -> Dict[str, Any]:
     return BENCHMARKS[BENCHMARK]
+
+
+def sample_size() -> int:
+    """How many original problems this benchmark samples (build_dataset.py writes data/<benchmark>/sample_<n>.json)."""
+    return int(BENCHMARKS[BENCHMARK].get("n", NUM_ORIGINAL_PROBLEMS))
+
+
+def solver_max_tokens() -> int:
+    """The reply cap for the solver samples and the ESV v3 check on this benchmark."""
+    return int(BENCHMARKS[BENCHMARK].get("solver_max_tokens", SOLVER_MAX_TOKENS))
 
 
 def add_benchmark_arg(parser) -> None:
@@ -72,8 +94,8 @@ select_benchmark(BENCHMARK)
 
 # ---- Experiment configuration ----------------------------------------------------------------------
 
-NUM_ORIGINAL_PROBLEMS = 200
-SAMPLE_SEED = 2026  # fixes the 200-problem sample and the tie-breaks of the perturbation-type balancer
+NUM_ORIGINAL_PROBLEMS = 200  # the default; a benchmark overrides it with "n" in BENCHMARKS (see sample_size())
+SAMPLE_SEED = 2026  # fixes the sampled problems and the tie-breaks of the perturbation-type balancer
 
 # Perturbation generator and verifiers: one model per family, as in the pilot.
 GENERATOR_MODEL = "deepseek/deepseek-v4-flash-0731"
@@ -100,8 +122,11 @@ ALL_SOLVER_MODELS = SMALL_SOLVER_MODELS + SOLVER_MODELS
 #   gsm8k 40: 100 + 2*100 + 10 + 8 = 318 seats, gold 319 counts the host    82: "$4 each" is per pack of 5 -> profit 288, gold 160
 #   gsm8k 95: half of the 20 left, split equally -> 5, gold 10               111: 70 * 2000 + 20000 = 160000, gold 162000
 #   gsm8k 189: the question is inconsistent with its own givens (gold 8)     105: "21% per year" read as simple interest (gold 7400)
+# math500: none found yet. MATH-500 golds are curated, but check this list again after the first full run - the
+# place to look is the instances where every solver's 4 CoT samples agree on one answer that is scored wrong.
 DISPUTED_INSTANCES: Dict[str, frozenset] = {
     "gsm8k": frozenset({"40_original", "82_original", "95_original", "111_original", "189_original", "105_original"}),
+    "math500": frozenset(),
 }
 
 
@@ -110,6 +135,7 @@ def is_disputed(instance_id: str) -> bool:
     return instance_id in DISPUTED_INSTANCES.get(BENCHMARK, frozenset())
 JUDGE_MODEL = "openai/gpt-oss-120b"  # grades ESV diagnoses only; never sees solver prompts it could influence
 
+SOLVER_MAX_TOKENS = 4000  # default reply cap for the solvers and the ESV checker; see solver_max_tokens()
 NUM_SAMPLES = 4           # initial solves per instance for DQA, CoT and ESV stage 0
 SAMPLE_TEMPERATURE = 0.7  # > 0 so the 4 samples can differ; ESV stages and the retry control use temperature 0
 NUMERIC_TOLERANCE = Decimal("0.01")
@@ -405,10 +431,14 @@ def to_confidence(value: Any) -> float:
 
 
 # ---- Answer formats and scoring --------------------------------------------------------------------
-# answer_format is derived from the question type (JEEBench's names; GSM8K problems are Integer) and is the same for a problem and its perturbation:
-#   MCQ -> "single" (exactly one option), MCQ(multiple) -> "multiple", Integer -> "integer", Numeric -> "numeric".
+# answer_format is derived from the question type (JEEBench's names; GSM8K problems are Integer; MATH-500 problems
+# are Integer, Numeric or Expression) and is the same for a problem and its perturbation:
+#   MCQ -> "single" (exactly one option), MCQ(multiple) -> "multiple", Integer -> "integer", Numeric -> "numeric",
+#   Expression -> "expression" (a LaTeX value: a fraction, radical, tuple, interval, polynomial or word; scored by
+#   expression_answers.py, the only place that knows how to compare those).
 
-ANSWER_FORMATS = {"MCQ": "single", "MCQ(multiple)": "multiple", "Integer": "integer", "Numeric": "numeric"}
+ANSWER_FORMATS = {"MCQ": "single", "MCQ(multiple)": "multiple", "Integer": "integer", "Numeric": "numeric",
+                  "Expression": "expression"}
 
 
 def answer_format_of(question_type: str) -> str:
@@ -425,6 +455,11 @@ def answer_format_note(answer_format: str) -> str:
     if answer_format == "numeric":
         return ("Answer format: the answer is a single number. If it is not an integer, give it correct to two decimal "
                 "places. final_answer must be just the number.")
+    if answer_format == "expression":
+        return ("Answer format: the answer is a single exact mathematical value written in LaTeX - a number, "
+                "fraction, radical, multiple of pi, coordinate tuple, interval, set, vector, polynomial or a single "
+                "word. final_answer must be just that value in simplest exact form, with no words of explanation, no "
+                "units and no '='. Keep it exact: write \\frac{14}{3} or 3\\sqrt{13}, never a decimal approximation.")
     if answer_format == "single":
         return "Answer format: multiple choice, exactly one option is correct. final_answer must be the option letter, e.g. B."
     return ("Answer format: multiple choice, one or more options may be correct. Select every correct option. "
@@ -485,7 +520,9 @@ def normalize_number(value: Any) -> Optional[Decimal]:
 
 
 def normalize_answer(value: Any, answer_format: str) -> Optional[str]:
-    """Canonical string form of an answer (option letters, or the number), or None if unreadable."""
+    """Canonical string form of an answer (option letters, the number, or the LaTeX value), or None if unreadable."""
+    if answer_format == "expression":
+        return expression_answers.normalize(value)
     if is_choice_format(answer_format):
         letters = normalize_choice(value)
         if letters and answer_format == "single" and len(letters) != 1:
@@ -498,6 +535,8 @@ def normalize_answer(value: Any, answer_format: str) -> Optional[str]:
 def answers_match(a: Optional[str], b: Optional[str], answer_format: str) -> bool:
     if a is None or b is None:
         return False
+    if answer_format == "expression":
+        return expression_answers.match(a, b)
     if is_choice_format(answer_format):
         return a == b
     tolerance = NUMERIC_TOLERANCE if answer_format == "numeric" else Decimal("1e-6")

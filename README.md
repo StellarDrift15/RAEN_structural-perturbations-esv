@@ -123,6 +123,32 @@ Self-verification fails not for lack of looking: the checker's text engages the 
 |---|---|---|---|
 | Accuracy | 90.6 → 94.4 (23 / 1) | 79.1 → 87.5 (25 / 0) | 93.6 → 97.6 (13 / 1) |
 
+### Compute cost (all 198 pairs, pooled)
+
+No method re-solves the problem: all share the same 4 CoT samples and add at most one call, so the baseline is a
+constant and the extra call is the entire difference.
+
+| | CoT maj@4 | USC | ESV self-check | **ESV independent** | CoT pass@4 (oracle) |
+|---|---|---|---|---|---|
+| Accuracy | 88.5% | 89.3% | 85.1% | **93.5%** | 94.5% |
+| Calls / instance | 4.00 | 4.26 | 4.26 | **4.26** | 4.00 |
+| Tokens / instance | 2,379 | 2,799 (+17.6%) | 3,158 (+32.7%) | **3,417 (+43.6%)** | 2,379 |
+| Wait (4 samples in parallel) | 6.5 s | 6.7 s | 10.8 s | **13.7 s** | 6.5 s |
+| Tokens per net fix | — | 49,112 | no net gain | **20,585** | 0 (needs gold) |
+
+The **disagreement gate is the efficiency mechanism**: it is free (code over answers already paid for) and fires on
+only 25.9% of instances, so it avoids **74.1%** of verification spend — ungated the same protocol would cost +168%
+instead of +43.6%, and gain nothing, since a unanimous instance has no second candidate to choose between. The spend
+is also adaptive: the gate fires 45.1% of the time on strategy-breaking P′ versus 17.5% on preserving P′, so ESV
+spends most where the accuracy gap is largest. ESV costs 2.5× USC's token overhead and returns 5.9× the net fixes,
+making it **2.4× more token-efficient per net fix than USC**.
+
+Caveat, stated in the report: the check is billed by a 120B verifier and the samples by 4–12B solvers, so the
+break-even against USC sits at k = 2.4 where k is the verifier's price per token over the solver's. USC is cheaper
+per fix above that — but its total gain is capped at +10 net fixes against ESV's +59, so more USC cannot reach
+93.5% at any price. Full accounting, including the per-arm, per-solver and price-sensitivity tables:
+["Compute cost" in `esv3_bottleneck_gsm8k.md`](experiments/results/gsm8k/analysis/esv3_bottleneck_gsm8k.md#compute-cost-2026-11-08).
+
 Selection quality on the 303 disagreeing instances: majority vote 61.1%, USC 64.4%, **ESV independent 80.5%**, oracle 84.5%, i.e. ESV recovers most of the gap between voting and the oracle.
 
 > The authoritative, regenerable write-ups are
@@ -172,9 +198,12 @@ Each benchmark item is a frozen pair **(P, P′)**: an original problem and a pe
 | Benchmark | Source | Sampled → pairs | Split (breaking / preserving) | Status |
 |---|---|---|---|---|
 | **GSM8K** | `openai/gsm8k` main, test | 1317 → 200 → **198** | 99 / 99 | **Primary; complete; GO** |
+| **MATH-500** | `HuggingFaceH4/MATH-500` test | 500 → 250 → TBD | TBD | Second benchmark; wired up and sampled, not yet run |
 | JEEBench (math) | JEE Advanced 2016–2023 | 236 → 200 → **193** | 97 / 96 | Retired dev benchmark |
 
-Both datasets use sample seed 2026. Frozen files: [`gsm8k`](experiments/data/gsm8k/frozen_dataset.json), [`jeebench`](experiments/data/jeebench/frozen_dataset.json). Every generation attempt is logged in `generation_log.jsonl`.
+All three use sample seed 2026. Frozen files: [`gsm8k`](experiments/data/gsm8k/frozen_dataset.json), [`jeebench`](experiments/data/jeebench/frozen_dataset.json). Every generation attempt is logged in `generation_log.jsonl`.
+
+**MATH-500** (Lightman et al., 2023) is the harder confirmation benchmark: competition problems at levels 1–5 across seven subjects. All 500 are kept, so the 250-problem sample spans three answer formats — 146 integer, 11 numeric and **93 LaTeX expression** (`\frac{14}{3}`, `3\sqrt{13}`, `(6,31,-1)`, `(-\infty,2)\cup(3,\infty)`, `52_8`, column vectors, single words). Expression answers are scored by [`expression_answers.py`](experiments/expression_answers.py), which normalizes the LaTeX and then escalates from exact string equality through element-wise comparison of tuples and intervals to sympy equivalence, bailing out rather than guessing; a decimal approximation of an exact value is never accepted. The scorer is applied identically to the gold and to every method's answers, and `analyze_esv3.py` prints a **By answer format** table so the expression slice can be checked against the exactly scored ones. Details: [`experiments/README.md`](experiments/README.md#math-500-and-the-expression-answer-format).
 
 ---
 
@@ -197,16 +226,18 @@ RAEN_structural-perturbations-esv/
 ├── experiments/                     CURRENT code, data and results (start here)
 │   ├── README.md                    detailed run-order and file roles for the experiment code
 │   ├── common.py                    config (models, seeds, n=4, T), OpenRouter client, tagged-output calls, scoring, McNemar
-│   ├── benchmarks.py                loads / caches source problems per benchmark (GSM8K, JEEBench)
+│   ├── benchmarks.py                loads / caches source problems per benchmark (GSM8K, MATH-500, JEEBench)
+│   ├── expression_answers.py        LaTeX normalization + equivalence for MATH-500's expression answers
 │   ├── perturb_prompts.py           generator + verifier prompts for both perturbation modes
-│   ├── build_dataset.py             sample 200 -> two-stage perturbation -> data/<benchmark>/frozen_dataset.json
+│   ├── build_dataset.py             sample n (200 / 250) -> two-stage perturbation -> data/<benchmark>/frozen_dataset.json
 │   ├── method_prompts.py            Direct QA, CoT, ESV v3 and USC prompts
 │   ├── run_methods.py               the 4 Direct QA + 4 CoT samples every method starts from
 │   ├── run_esv3.py                  ESV v3 + USC control (--verifier-model = independent checker)
 │   ├── analyze_esv3.py              offline reports: stage tables, go / no-go, every comparison
-│   ├── tests/smoke_test_offline.py  end-to-end check on both benchmarks with a fake client, no API calls
-│   ├── data/{gsm8k,jeebench}/       source, sampled, frozen datasets, generation logs
-│   └── results/{gsm8k,jeebench}/    per-solver records and analysis reports
+│   ├── tests/smoke_test_offline.py  end-to-end check on all three benchmarks with a fake client, no API calls
+│   ├── tests/test_expression_answers.py  the expression scorer, incl. all 500 MATH-500 golds
+│   ├── data/{gsm8k,math500,jeebench}/    source, sampled, frozen datasets, generation logs
+│   └── results/{gsm8k,math500,jeebench}/ per-solver records and analysis reports
 ├── pilot_experiment/src/            ARCHIVED pilot (Oct 2026): original 5-stage ESV, JEEBench, one solver
 │   ├── main.py                      pilot dataset builder / runner
 │   ├── methods/esv.py               pilot 5-stage ESV pipeline (recognition → diagnosis → strategy → recovery → final)
@@ -221,9 +252,10 @@ RAEN_structural-perturbations-esv/
 | File | Role |
 |---|---|
 | [`common.py`](experiments/common.py) | Single source of truth: `SMALL_SOLVER_MODELS`, `SOLVER_MODELS`, `NUM_SAMPLES = 4`, `SAMPLE_TEMPERATURE = 0.7`, `SAMPLE_SEED = 2026`, type-aware answer scoring, exact McNemar, resumable I/O |
-| [`benchmarks.py`](experiments/benchmarks.py) | Normalizes each benchmark's problems to one shape; pulls and caches GSM8K |
+| [`benchmarks.py`](experiments/benchmarks.py) | Normalizes each benchmark's problems to one shape; pulls and caches GSM8K and MATH-500 |
+| [`expression_answers.py`](experiments/expression_answers.py) | The `expression` answer format: LaTeX normalization, element-wise comparison of tuples / intervals / vectors, guarded sympy equivalence |
 | [`perturb_prompts.py`](experiments/perturb_prompts.py) | Format-preserving prompts for breaking and preserving perturbations |
-| [`build_dataset.py`](experiments/build_dataset.py) | Samples 200, perturbs, verifies, balances modes, freezes the dataset (`--freeze-only` rebuilds from the log) |
+| [`build_dataset.py`](experiments/build_dataset.py) | Samples the benchmark's `n` problems, perturbs, verifies, balances modes, freezes the dataset (`--freeze-only` rebuilds from the log) |
 | [`method_prompts.py`](experiments/method_prompts.py) | Prompts for Direct QA, CoT, ESV v3 verification and USC |
 | [`run_methods.py`](experiments/run_methods.py) | Produces `records.json` (4 DQA + 4 CoT samples per instance) |
 | [`run_esv3.py`](experiments/run_esv3.py) | Runs ESV v3 and USC; resumes where it stopped |
@@ -253,6 +285,7 @@ RAEN_structural-perturbations-esv/
 | Self-check fails on the dev split (NO-GO) | `esv3_report_small.upto60.md` |
 | USC actually selected (not silently falling back to the majority) | "Did USC actually select?" table in the full report |
 | Failures concentrate on strategy-breaking P′ | "What the wrong answers are" table (79.1% maj@4 on breaking vs 90.6% on originals) |
+| ESV costs +43.6% tokens, not a multiple of the baseline, and is 2.4× more token-efficient per net fix than USC | "Compute cost" section of any `esv3_report_small*.md`, regenerated by `analyze_esv3.py` from the stored `usage` / `latency_seconds` |
 | Scoring and gold labels are not the cause of earlier JEEBench failures | Section 5 of `esv_bottleneck_analysis.md` |
 
 ### Report index (`experiments/results/gsm8k/analysis/`)
@@ -269,17 +302,20 @@ RAEN_structural-perturbations-esv/
 
 ## Reproducing the results
 
-**Requirements.** Python 3.12 (used throughout), plus `openai`, `python-dotenv`, `tqdm`; `datasets` is needed only to pull GSM8K from Hugging Face (a cached copy is committed at `experiments/data/gsm8k/source.json`). There is no pinned requirements file yet.
+**Requirements.** Python 3.12 (used throughout), plus `openai`, `python-dotenv`, `tqdm`, and `sympy` for MATH-500's expression scoring; `datasets` is needed only to pull GSM8K and MATH-500 from Hugging Face (cached copies are committed at `experiments/data/<benchmark>/source.json`). There is no pinned requirements file yet.
 
 ```bash
-pip install openai python-dotenv tqdm datasets
+pip install openai python-dotenv tqdm sympy datasets
 ```
 
 ### 1. Offline checks (no API key, no cost)
 
 ```bash
-# Every pipeline step on both benchmarks against a fake model client; writes only to a temp folder
+# Every pipeline step on all three benchmarks against a fake model client; writes only to a temp folder
 python experiments/tests/smoke_test_offline.py
+
+# The expression scorer, including all 500 MATH-500 golds
+python experiments/tests/test_expression_answers.py
 
 # Rebuild any committed report from stored records (no API calls)
 python experiments/analyze_esv3.py --benchmark gsm8k --models small --verifier-model openai/gpt-oss-120b
@@ -292,10 +328,10 @@ python experiments/analyze_esv3.py --benchmark gsm8k --models small --verifier-m
 Create `experiments/.env` containing `OPENROUTER_API_KEY=...` (git-ignored) or point `RAEN_ENV_FILE` at one. Every step resumes where it stopped.
 
 ```bash
-B=gsm8k
+B=math500   # or gsm8k
 python experiments/benchmarks.py $B                                             # 1. pull / summarize source
 python experiments/build_dataset.py --benchmark $B --limit 10                   # 2. small live check of the perturbation pipeline
-python experiments/build_dataset.py --benchmark $B                              #    then all 200 problems
+python experiments/build_dataset.py --benchmark $B                              #    then every sampled problem (200, or 250 for math500)
 python experiments/run_methods.py --benchmark $B \
     --models qwen/qwen-2.5-7b-instruct mistralai/mistral-nemo google/gemma-3-4b-it   # 3. the 4 DQA + 4 CoT samples
 python experiments/analyze_esv3.py --benchmark $B --models small               #    stage 1: headroom + trap rate
@@ -316,8 +352,8 @@ Decide on stage 1 before paying for the checker: if the solvers' four CoT sample
 
 ```text
 experiments/data/<benchmark>/
-    source.json              GSM8K only: cached source problems
-    sample_200.json          the seeded 200-problem sample
+    source.json              GSM8K and MATH-500: cached source problems
+    sample_<n>.json          the seeded sample (sample_200.json; sample_250.json for MATH-500)
     generation_log.jsonl     every perturbation attempt (accepted and rejected)
     frozen_dataset.json      final (P, P') pairs with gold, strategy, changed condition, validation
 experiments/results/<benchmark>/<solver>/
@@ -348,7 +384,7 @@ Retired runners (ESV v2 / v4, the retry controls, `analyze.py`) were removed fro
 
 ## Limitations
 
-- **Scope.** One primary benchmark (GSM8K), three small open-weight solvers, integer answers only.
+- **Scope.** One primary benchmark (GSM8K), three small open-weight solvers, integer answers only. MATH-500 is wired up and sampled to widen this on both axes — competition difficulty and non-numeric answers — but has not been run, so every number in this README is still GSM8K's.
 - **Checker strength is confounded with independence.** The checker (`gpt-oss-120b`) is larger than the solvers. Two controls (below) separate "the ESV structure helps" from "a bigger model picks better".
 - **Headroom.** Large solvers are near ceiling on GSM8K (~97% maj@4), so they cannot test a selection method.
 - **Selection only.** ESV chooses among existing candidates; its ceiling is CoT pass@4 (94.5%). It cannot create a new answer (stage 4 not built).
@@ -364,7 +400,8 @@ Retired runners (ESV v2 / v4, the retry controls, `analyze.py`) were removed fro
 | **Judge-select control** | Same verifier and candidates, asked only "which answer is correct" with no bindings protocol. Tests whether the ESV *structure* matters | Pending |
 | **Same-size cross-verifier** | e.g. Nemo checks Qwen and vice versa. Separates independence from capability | Pending |
 | Large-solver arm | Report as a no-headroom control | Optional |
-| Harder / second benchmark | MATH-Perturb, code I/O contracts | Future |
+| **Harder second benchmark** | MATH-500: competition problems, three answer formats, 93 of 250 answering with a LaTeX expression | **Wired up and sampled; run pending** |
+| Code I/O contracts | A third, non-mathematical domain | Future |
 | Stage 4 repair | Use the diagnosis when no candidate survives | Future (ceiling is quantified in the report's decisions table) |
 | Pinned `requirements.txt` | Environment reproducibility | To do |
 
@@ -396,7 +433,7 @@ Retired runners (ESV v2 / v4, the retry controls, `analyze.py`) were removed fro
 }
 ```
 
-**Key references.** JEEBench (Arora et al., 2023, [arXiv:2305.15074](https://arxiv.org/abs/2305.15074)); *Large Language Models Cannot Self-Correct Reasoning Yet* (Huang et al., 2024, [arXiv:2310.01798](https://arxiv.org/abs/2310.01798)); Universal Self-Consistency (Chen et al., 2023); GSM8K (Cobbe et al., 2021).
+**Key references.** JEEBench (Arora et al., 2023, [arXiv:2305.15074](https://arxiv.org/abs/2305.15074)); *Large Language Models Cannot Self-Correct Reasoning Yet* (Huang et al., 2024, [arXiv:2310.01798](https://arxiv.org/abs/2310.01798)); Universal Self-Consistency (Chen et al., 2023); GSM8K (Cobbe et al., 2021); MATH (Hendrycks et al., 2021, [arXiv:2103.03874](https://arxiv.org/abs/2103.03874)) and the MATH-500 subset of *Let's Verify Step by Step* (Lightman et al., 2023, [arXiv:2305.20050](https://arxiv.org/abs/2305.20050)).
 
 **License.** [Apache License 2.0](LICENSE).
 

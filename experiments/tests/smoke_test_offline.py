@@ -38,12 +38,20 @@ def detect_format(prompt: str) -> str:
         return "multiple"
     if "non-negative integer" in prompt or "just the integer" in prompt:
         return "integer"
+    if "in LaTeX" in prompt or "exact value" in prompt:  # MATH-500's expression format
+        return "expression"
     return "numeric"
+
+
+# One answer per format, and a different one, so a fake reply can be made to agree or disagree on purpose.
+FORMAT_ANSWERS = {"single": ("B", "C"), "multiple": ("AC", "A"), "integer": ("7", "5"), "numeric": ("2.25", "3.5"),
+                  "expression": (r"\frac{3}{2}", r"3\sqrt{13}")}
 
 
 def random_answer(rng: random.Random, fmt: str) -> str:
     return {"single": lambda: rng.choice("ABCD"), "multiple": lambda: rng.choice(["A", "AB", "AC", "BCD", "ABCD"]),
-            "integer": lambda: str(rng.randint(0, 9)), "numeric": lambda: rng.choice(["0.5", "2.25", "3", "12.75"])}[fmt]()
+            "integer": lambda: str(rng.randint(0, 9)), "numeric": lambda: rng.choice(["0.5", "2.25", "3", "12.75"]),
+            "expression": lambda: rng.choice([r"\frac{3}{2}", r"3\sqrt{13}", "(6,31,-1)", "x^2-4", r"\frac{\pi}{2}"])}[fmt]()
 
 
 def tags(**fields) -> str:
@@ -75,8 +83,8 @@ class FakeCompletions:
             if rng.random() < 0.15:
                 return tags(status="REJECT")
             mode = "preserving" if "STILL WORKS" in prompt else "breaking"
-            answer = {"single": "B", "multiple": "AC", "integer": "7", "numeric": "2.25"}[fmt]
-            naive = answer if mode == "preserving" else {"single": "C", "multiple": "A", "integer": "5", "numeric": "3.5"}[fmt]
+            answer, other = FORMAT_ANSWERS[fmt]
+            naive = answer if mode == "preserving" else other
             opts = {f"option_{l}": f"${i + 1}\\sqrt{{{rng.randint(2, 99)}}}$" for i, l in enumerate("ABCD")} if fmt in ("single", "multiple") \
                 else {f"option_{l}": "(empty)" for l in "ABCD"}
             return tags(status="CANDIDATE", P_prime=f"[MODE={mode}] Perturbed problem {rng.randint(0, 10**6)}: compute \\frac{{1}}{{2}}.",
@@ -86,7 +94,7 @@ class FakeCompletions:
         if "Solve this math problem independently" in prompt:
             fmt = detect_format(prompt.split("Additional rules:")[1])
             m = re.search(r"\[MODE=(\w+)\]", prompt)
-            answer = {"single": "B", "multiple": "AC", "integer": "7", "numeric": "2.25"}[fmt]
+            answer = FORMAT_ANSWERS[fmt][0]
             if rng.random() < 0.1:
                 answer = random_answer(rng, fmt)  # occasional verifier disagreement
             return tags(valid_problem="true", reason="well-posed", derivation="...", answer_prime=answer,
@@ -148,11 +156,22 @@ def main() -> int:
     check(common.normalize_answer("NONE", "single") is None and common.normalize_answer("NONE", "numeric") is None, "NONE is unreadable")
     check(common.majority_answer(["B", "C", "C", None], "single") == "C", "majority vote")
     check(common.majority_answer(["2.25", "2.26", "3", None], "numeric") == "2.25", "numeric majority groups within tolerance")
+    # The expression format (MATH-500). Exhaustive checks live in tests/test_expression_answers.py; these confirm
+    # that common.py routes the format to it and that majority voting groups equivalent LaTeX.
+    check(common.answer_format_of("Expression") == "expression", "question type Expression -> expression format")
+    check(common.score_answer(r"\dfrac{14}{3}", r"\frac{14}{3}", "expression")["correct"], r"expression: \dfrac == \frac")
+    check(common.score_answer(r"$3\sqrt{13}$", r"\sqrt{117}", "expression")["correct"], "expression: symbolic equivalence")
+    check(not common.score_answer("4.67", r"\frac{14}{3}", "expression")["correct"], "expression: a decimal is not the exact value")
+    check(not common.score_answer("52", "52_8", "expression")["correct"], "expression: base 8 is not a plain number")
+    check(common.normalize_answer("NONE", "expression") is None, "expression: NONE is unreadable")
+    check(common.majority_answer([common.normalize_answer(a, "expression") for a in (r"\frac12", r"\frac{1}{2}", "2", None)],
+                                 "expression") == r"\frac{1}{2}", "expression majority groups equivalent forms")
     # Stage 1+2: perturbation pipeline on 24 sampled problems
     sys.argv = ["build_dataset.py", "--limit", "24", "--workers", "4"]
     build_dataset.make_client = lambda: FakeClient(seed=1)
     check(build_dataset.main() == 0, "build_dataset ran")
     ds = json.loads((common.FROZEN_DATASET).read_text(encoding="utf-8"))
+    check(common.sample_size() == 200, "jeebench samples 200 problems")
     sample = json.loads((common.DATA_DIR / "sample_200.json").read_text(encoding="utf-8"))
     # JEEBench's "index" restarts in every paper, so a problem is identified by (paper, index).
     check(sample["n"] == 200 and len({(p["source"], p["source_index"]) for p in sample["problems"]}) == 200, "200 distinct problems sampled")
@@ -289,6 +308,64 @@ def main() -> int:
           and (WORK / "results" / "gsm8k" / common.model_slug(common.SOLVER_MODELS[0]) / "records.json").exists(), "run_methods --benchmark gsm8k writes under results/gsm8k/")
     check(analyze_esv3.main(["--benchmark", "gsm8k"]) == 0 and (WORK / "results" / "gsm8k" / "analysis" / "esv3_report.md").exists(), "analyze_esv3 --benchmark gsm8k")
     check(sorted(p.relative_to(WORK) for p in (WORK / "results" / "jeebench").rglob("*.json")) == jee_results, "the gsm8k run left the jeebench results untouched")
+
+    # A third benchmark (MATH-500): 250 sampled instead of 200, and three answer formats in one benchmark, including
+    # `expression`. Every stage runs end to end, into data/math500/ and results/math500/.
+    gsm_results = sorted(p.relative_to(WORK) for p in (WORK / "results" / "gsm8k").rglob("*.json"))
+    fake_math = []
+    for i in range(36):
+        kind = ("Integer", "Numeric", "Expression")[i % 3]
+        gold = {"Integer": str(10 + i), "Numeric": f"-{i}.5", "Expression": r"\frac{%d}{7}" % (i + 1)}[kind]
+        fake_math.append({"source": "MATH-500 test", "source_index": i, "type": kind, "gold": gold,
+                          "question": f"Problem {i}: find the value of $x_{{{i}}}$ in simplest form.",
+                          "subject": ("Algebra", "Precalculus", "Geometry")[i % 3], "level": 1 + i % 5,
+                          "unique_id": f"test/fake/{i}.json", "solution": "..."})
+    common.save_json(benchmarks.math500_source_path(), fake_math)
+    rows = benchmarks.load_source("math500")
+    check(len(rows) == 36 and {r["type"] for r in rows} == {"Integer", "Numeric", "Expression"},
+          "math500 source: cached file read, all three question types kept")
+    check(benchmarks.math500_type("7") == "Integer" and benchmarks.math500_type("-2.5") == "Numeric"
+          and benchmarks.math500_type(r"\frac{1}{2}") == "Expression", "math500_type reads the type off the gold")
+    sys.argv = ["build_dataset.py", "--limit", "18", "--workers", "4", "--benchmark", "math500", "--quiet"]
+    build_dataset.make_client = lambda: FakeClient(seed=31)
+    check(build_dataset.main() == 0 and common.BENCHMARK == "math500" and common.sample_size() == 250
+          and build_dataset.sample_path() == WORK / "data" / "math500" / "sample_250.json",
+          "build_dataset --benchmark math500 samples 250 into data/math500/sample_250.json")
+    m = json.loads(common.FROZEN_DATASET.read_text(encoding="utf-8"))
+    check(m["benchmark"] == "math500" and m["num_pairs"] > 0, f"math500 pairs built ({m['num_pairs']})")
+    check(all(p["answer_format"] in ("integer", "numeric", "expression") for p in m["pairs"])
+          and all("(A)" not in p["perturbed_problem"] for p in m["pairs"]), "math500 pairs are option-free")
+    check(all(p.get("subject") and p.get("level") for p in m["pairs"]), "subject and level are carried into the pairs")
+    check(all(common.normalize_answer(p["answer_prime"], p["answer_format"]) is not None for p in m["pairs"]),
+          "every math500 answer_prime is readable in its own format")
+    solver = common.SMALL_SOLVER_MODELS[0]
+    check(common.solver_max_tokens() == 6000, "math500 raises the solver token cap")
+    check(run_methods.main(["--workers", "4", "--benchmark", "math500", "--models", solver], client=FakeClient(seed=32)) == 0,
+          "run_methods --benchmark math500 ran")
+    check(run_esv3.main(["--workers", "4", "--benchmark", "math500", "--models", solver], client=FakeClient(seed=33)) == 0,
+          "run_esv3 --benchmark math500 ran")
+    check(run_esv3.main(["--workers", "4", "--benchmark", "math500", "--models", solver,
+                         "--verifier-model", "openai/gpt-oss-120b"], client=FakeClient(seed=34)) == 0,
+          "run_esv3 --benchmark math500 --verifier-model ran")
+    folder = WORK / "results" / "math500" / common.model_slug(solver)
+    check((folder / "records.json").exists() and (folder / "esv3_records.json").exists()
+          and (folder / "esv3_records.gpt-oss-120b.json").exists(), "math500 results land in results/math500/<model>/")
+    check(analyze_esv3.main(["--benchmark", "math500", "--models", "small"]) == 0,
+          "analyze_esv3 --benchmark math500 ran")
+    report = (WORK / "results" / "math500" / "analysis" / "esv3_report_small.md").read_text(encoding="utf-8")
+    formats = {p["answer_format"] for p in m["pairs"]}
+    check("MATH-500" in report and (len(formats) < 2 or "By answer format" in report),
+          f"the math500 report is labelled MATH-500 and splits by answer format ({sorted(formats)})")
+    # The split itself, independently of which formats this small run happened to accept.
+    synthetic = [{"format": f, "correct": {"cot_maj": True, "usc": True, "esv3": f == "integer"}}
+                 for f in ("integer", "numeric", "expression")]
+    split = analyze_esv3.format_breakdown(synthetic, ("cot_maj", "usc", "esv3"))
+    check("answer format" in split and "expression" in split and not analyze_esv3.format_breakdown(synthetic[:1], ("cot_maj",)),
+          "format_breakdown splits a mixed-format benchmark and stays silent on a single-format one")
+    check(analyze_esv3.main(["--benchmark", "math500", "--models", "small", "--verifier-model", "openai/gpt-oss-120b"]) == 0,
+          "analyze_esv3 --benchmark math500 --verifier-model ran")
+    check(sorted(p.relative_to(WORK) for p in (WORK / "results" / "gsm8k").rglob("*.json")) == gsm_results,
+          "the math500 run left the gsm8k results untouched")
     common.select_benchmark("jeebench")
     print(f"\nAll offline checks passed. Outputs: {WORK}")
     return 0

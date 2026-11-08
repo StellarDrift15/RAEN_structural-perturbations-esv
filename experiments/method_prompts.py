@@ -58,13 +58,37 @@ Return your response using exactly this tag:
 Do not omit the final answer."""
 
 
+# MATH-500's Expression problems answer with a LaTeX value, not a number, so "the final answer as a number" would
+# contradict the format note the same way the MCQ wording did on GSM8K. The integer / numeric and MCQ wordings above
+# are untouched, so JEEBench and GSM8K prompts stay byte-identical to the frozen runs.
+COT_INSTRUCTION_EXPRESSION = """Solve the following problem carefully. Work through the mathematical reasoning step by step before selecting your final answer.
+
+Identify the relevant concepts, derive the necessary equations, and verify that your reasoning satisfies the problem's conditions.
+
+Return your response using exactly these tags:
+<reasoning>Your step-by-step mathematical solution</reasoning>
+<final_answer>The final answer as a single exact value in LaTeX, and nothing else</final_answer>
+Do not omit the final answer."""
+
+DIRECT_INSTRUCTION_EXPRESSION = """Solve the following problem. Give ONLY the final answer: do not write any reasoning, working or explanation.
+
+Return your response using exactly this tag:
+<final_answer>The final answer as a single exact value in LaTeX, and nothing else</final_answer>
+Do not omit the final answer."""
+
+
 def cot_instruction(answer_format: str) -> str:
-    """The CoT instruction for this answer format: the MCQ wording is sent only where options exist."""
-    return COT_INSTRUCTION if common.is_choice_format(answer_format) else COT_INSTRUCTION_NUMERIC
+    """The CoT instruction for this answer format: the MCQ wording is sent only where options exist, and the
+    "as a number" wording only where the answer really is a number."""
+    if common.is_choice_format(answer_format):
+        return COT_INSTRUCTION
+    return COT_INSTRUCTION_EXPRESSION if answer_format == "expression" else COT_INSTRUCTION_NUMERIC
 
 
 def direct_instruction(answer_format: str) -> str:
-    return DIRECT_INSTRUCTION if common.is_choice_format(answer_format) else DIRECT_INSTRUCTION_NUMERIC
+    if common.is_choice_format(answer_format):
+        return DIRECT_INSTRUCTION
+    return DIRECT_INSTRUCTION_EXPRESSION if answer_format == "expression" else DIRECT_INSTRUCTION_NUMERIC
 
 
 COT_FIELDS = ["reasoning", "final_answer"]

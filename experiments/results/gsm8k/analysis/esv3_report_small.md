@@ -57,9 +57,9 @@ ESV targets the *trap*: the answer the original strategy S yields when applied b
 
 **qwen/qwen-2.5-7b-instruct** (390 instances)
 
-| Method | accuracy | fixes | breaks | net vs CoT maj@4 | extra tokens / calls per instance |
+| Method | accuracy | fixes | breaks | net vs CoT maj@4 | extra completion tokens / calls per instance |
 |---|---|---|---|---|---|
-| Direct QA maj@4 | 18.7% | 3 | 285 | -282 (p=0.000) |  |
+| Direct QA maj@4 | 18.7% | 3 | 285 | -282 (p=2e-80) |  |
 | CoT pass@1 | 88.7% |  |  |  |  |
 | CoT maj@4 (initial) | 91.0% |  |  |  |  |
 | CoT pass@4 (oracle choice) | 94.9% |  |  |  |  |
@@ -68,20 +68,20 @@ ESV targets the *trap*: the answer the original strategy S yields when applied b
 
 **mistralai/mistral-nemo** (390 instances)
 
-| Method | accuracy | fixes | breaks | net vs CoT maj@4 | extra tokens / calls per instance |
+| Method | accuracy | fixes | breaks | net vs CoT maj@4 | extra completion tokens / calls per instance |
 |---|---|---|---|---|---|
-| Direct QA maj@4 | 10.5% | 3 | 291 | -288 (p=0.000) |  |
+| Direct QA maj@4 | 10.5% | 3 | 291 | -288 (p=3e-82) |  |
 | CoT pass@1 | 78.7% |  |  |  |  |
 | CoT maj@4 (initial) | 84.4% |  |  |  |  |
 | CoT pass@4 (oracle choice) | 94.4% |  |  |  |  |
 | Universal Self-Consistency | 85.9% | 11 | 5 | +6 (p=0.210) | 4 / 0.42 |
-| ESV v3 (stages 1-3) | 78.5% | 10 | 33 | -23 (p=0.001) | 341 / 0.42 |
+| ESV v3 (stages 1-3) | 78.5% | 10 | 33 | -23 (p=6e-04) | 341 / 0.42 |
 
 **google/gemma-3-4b-it** (390 instances)
 
-| Method | accuracy | fixes | breaks | net vs CoT maj@4 | extra tokens / calls per instance |
+| Method | accuracy | fixes | breaks | net vs CoT maj@4 | extra completion tokens / calls per instance |
 |---|---|---|---|---|---|
-| Direct QA maj@4 | 7.2% | 1 | 324 | -323 (p=0.000) |  |
+| Direct QA maj@4 | 7.2% | 1 | 324 | -323 (p=1e-95) |  |
 | CoT pass@1 | 88.1% |  |  |  |  |
 | CoT maj@4 (initial) | 90.0% |  |  |  |  |
 | CoT pass@4 (oracle choice) | 94.4% |  |  |  |  |
@@ -90,16 +90,16 @@ ESV targets the *trap*: the answer the original strategy S yields when applied b
 
 **Pooled** (1170 instances)
 
-| Method | accuracy | fixes | breaks | net vs CoT maj@4 | extra tokens / calls per instance |
+| Method | accuracy | fixes | breaks | net vs CoT maj@4 | extra completion tokens / calls per instance |
 |---|---|---|---|---|---|
-| Direct QA maj@4 | 12.1% | 7 | 900 | -893 (p=0.000) |  |
+| Direct QA maj@4 | 12.1% | 7 | 900 | -893 (p=2e-256) |  |
 | CoT pass@1 | 85.1% |  |  |  |  |
 | CoT maj@4 (initial) | 88.5% |  |  |  |  |
 | CoT pass@4 (oracle choice) | 94.5% |  |  |  |  |
 | Universal Self-Consistency | 89.3% | 19 | 9 | +10 (p=0.087) | 3 / 0.26 |
-| ESV v3 (stages 1-3) | 85.1% | 18 | 57 | -39 (p=0.000) | 226 / 0.26 |
+| ESV v3 (stages 1-3) | 85.1% | 18 | 57 | -39 (p=7e-06) | 226 / 0.26 |
 
-ESV v3 vs USC (ESV-only / USC-only right, McNemar p): 17 / 66 (p=0.000)
+ESV v3 vs USC (ESV-only / USC-only right, McNemar p): 17 / 66 (p=6e-08)
 
 ### Did USC actually select? (pooled)
 
@@ -153,3 +153,48 @@ USC names its pick in one tag. Where that tag cannot be resolved to a response, 
 | original | 576 | 90.6% | 91.5% | 88.7% | 7 / 18 |
 | breaking | 297 | 79.1% | 79.8% | 72.7% | 8 / 27 |
 | preserving | 297 | 93.6% | 94.6% | 90.6% | 3 / 12 |
+
+## Compute cost
+
+Read off the `usage` and `latency_seconds` stored on every call, so this section is reproducible offline from the records. Every method starts from the same 4 CoT samples and adds at most one call, so the baseline is shared and only the extra call separates them. **serial** is billed compute time; **critical path** is what a user waits for, since `run_methods.py` issues the 4 samples concurrently while the extra call cannot start until all 4 are back.
+
+| Method | accuracy | calls | solver tokens | verifier tokens | total tokens | vs CoT maj@4 | serial s | critical path s |
+|---|---|---|---|---|---|---|---|---|
+| Direct QA maj@4 | 12.1% | 4.00 | 1,095 | - | 1,095 | -54.0% | 2.4 | 1.0 |
+| CoT pass@1 | 85.1% | 1.00 | 595 | - | 595 | -75.0% | 4.8 | 4.8 |
+| CoT maj@4 (initial) | 88.5% | 4.00 | 2,379 | - | 2,379 | +0.0% | 19.2 | 6.5 |
+| Universal Self-Consistency | 89.3% | 4.26 | 2,799 | - | 2,799 | +17.6% | 19.4 | 6.7 |
+| ESV v3 (stages 1-3) | 85.1% | 4.26 | 3,158 | - | 3,158 | +32.7% | 23.5 | 10.8 |
+| CoT pass@4 (oracle choice) | 94.5% | 4.00 | 2,379 | - | 2,379 | +0.0% | 19.2 | 6.5 |
+
+### What the extra compute buys (pooled)
+
+| Method | accuracy vs CoT maj@4 | fixes / breaks | net | McNemar | extra tokens / instance | extra wait | extra tokens per net fix |
+|---|---|---|---|---|---|---|---|
+| Direct QA maj@4 | -76.3 pp | 7 / 900 | -893 | p=2e-256 | -1,284 | -5.5 s | no net gain |
+| Universal Self-Consistency | +0.9 pp | 19 / 9 | +10 | p=0.087 | +420 | +0.2 s | 49,112 |
+| ESV v3 (stages 1-3) | -3.3 pp | 18 / 57 | -39 | p=7e-06 | +779 | +4.3 s | no net gain |
+| CoT pass@4 (oracle choice) | +6.1 pp | 71 / 0 | +71 | p=8e-22 | +0 | +0.0 s | 0 |
+
+### The disagreement gate is the efficiency mechanism (pooled)
+
+Stage 1 costs nothing - it is code over answers the solver already produced - and it is what keeps ESV under 1.5x the baseline despite a verification call that is itself larger than a CoT sample.
+
+|  | per instance |
+|---|---|
+| Instances where the gate fires (>= 2 distinct candidates) | 303/1170 (25.9%) |
+| A verification call, on an instance that fires | 3,008 tokens, 16.5 s |
+| Amortized over every instance (what ESV actually costs) | 779 tokens, 4.3 s |
+| The same protocol ungated, verifying every instance | 3,008 tokens, 16.5 s |
+| Verification spend the gate avoids | 74.1% |
+| Cost on a gated-out instance | 0 tokens, 0 s - ESV returns the CoT maj@4 answer untouched |
+
+### Compute by arm (pooled)
+
+The gate fires where the perturbation actually hurts, so ESV spends most on the strategy-breaking arm - which is also where it gains most. The cost profile is adaptive, not flat.
+
+| arm | instances | gate fires | CoT maj@4 | ESV v3 | baseline tokens | extra tokens | vs baseline |
+|---|---|---|---|---|---|---|---|
+| original | 576 | 117/576 (20.3%) | 90.6% | 88.7% | 2,279 | +572 | +25.1% |
+| breaking | 297 | 134/297 (45.1%) | 79.1% | 72.7% | 2,764 | +1,454 | +52.6% |
+| preserving | 297 | 52/297 (17.5%) | 93.6% | 90.6% | 2,188 | +504 | +23.0% |

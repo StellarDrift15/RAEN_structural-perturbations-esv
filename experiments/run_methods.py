@@ -8,9 +8,9 @@ baseline, and ESV v3 (run_esv3.py) re-reads these same samples, so every method 
 Outputs: results/<benchmark>/<model>/records.json (every call, raw responses included). Reports: analyze_esv3.py.
 
 Run (from the repo root):
-  python experiments/run_methods.py --benchmark gsm8k --limit-pairs 2    # smoke test, all three solvers
-  python experiments/run_methods.py --benchmark gsm8k                    # full run (resumes automatically)
-  python experiments/run_methods.py --benchmark gsm8k --models qwen/qwen-2.5-7b-instruct   # one solver
+  python experiments/run_methods.py --benchmark math500 --limit-pairs 2  # smoke test, all three solvers
+  python experiments/run_methods.py --benchmark math500                  # full run (resumes automatically)
+  python experiments/run_methods.py --benchmark math500 --models qwen/qwen-2.5-7b-instruct   # one solver
 """
 
 import argparse
@@ -31,7 +31,9 @@ import method_prompts as mp  # noqa: E402
 
 # Bump whenever a prompt, sampling setting or scoring rule changes: resume only reuses records of the same version.
 RUN_VERSION = "jee_methods_v1_2026-11-01"
-SOLVER_MAX_TOKENS = 4000  # non-reasoning solvers; a truncated reply is retried once with the cap doubled
+# Non-reasoning solvers; a truncated reply is retried once with the cap doubled. The effective cap is per benchmark
+# (common.solver_max_tokens): 4000 everywhere, 6000 on MATH-500.
+SOLVER_MAX_TOKENS = common.SOLVER_MAX_TOKENS
 METHODS = ("dqa", "cot")
 
 STOP = threading.Event()  # set on an invalid API key
@@ -75,8 +77,8 @@ class Runner:
 
     def solver(self, stage: str, prompt: str, fields: List[str], required: List[str], temperature: float = 0.0,
                seed: Optional[int] = None) -> Dict[str, Any]:
-        call = call_stage(self.client, self.model, stage, prompt, fields, required, self.reasoning, SOLVER_MAX_TOKENS,
-                          temperature=temperature, seed=seed)
+        call = call_stage(self.client, self.model, stage, prompt, fields, required, self.reasoning,
+                          common.solver_max_tokens(), temperature=temperature, seed=seed)
         if is_api_failure(call):
             raise ApiFailure(f"{stage}: {call['errors'][-1] if call['errors'] else 'api error'}")
         return call
@@ -113,7 +115,7 @@ def run_model(client, model: str, pairs: List[Dict[str, Any]], args) -> Dict[str
             "model": model, "run_version": RUN_VERSION, "samples": {m: [None] * NUM_SAMPLES for m in METHODS},
         }
     metadata = {"model": model, "run_version": RUN_VERSION, "num_samples": NUM_SAMPLES,
-                "sample_temperature": SAMPLE_TEMPERATURE, "solver_max_tokens": SOLVER_MAX_TOKENS,
+                "sample_temperature": SAMPLE_TEMPERATURE, "solver_max_tokens": common.solver_max_tokens(),
                 "reasoning": args.reasoning, "frozen_dataset": str(common.FROZEN_DATASET), "pairs": len(pairs)}
     lock = threading.Lock()
     last_save = [time.time()]
