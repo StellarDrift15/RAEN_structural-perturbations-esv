@@ -80,6 +80,7 @@ Every method starts from the **same four CoT samples**. None re-solves the probl
 | Direct QA maj@4 | 0 | none (no reasoning) |
 | CoT maj@4 (baseline) | 0 | the vote |
 | Universal Self-Consistency (control) | 1 | the vote, read in prose |
+| Judge-select (control) | 1 | the same candidates and checker, free-form reasoning, no ESV form |
 | **ESV (ours)** | 1 | the problem's givens; vote counts are *hidden* from the checker |
 
 ---
@@ -232,7 +233,7 @@ RAEN_structural-perturbations-esv/
 │   ├── build_dataset.py             sample n (200 / 250) -> two-stage perturbation -> data/<benchmark>/frozen_dataset.json
 │   ├── method_prompts.py            Direct QA, CoT, ESV v3 and USC prompts
 │   ├── run_methods.py               the 4 Direct QA + 4 CoT samples every method starts from
-│   ├── run_esv3.py                  ESV v3 + USC control (--verifier-model = independent checker)
+│   ├── run_esv3.py                  ESV v3 + USC and judge-select controls (--verifier-model, --judge-select)
 │   ├── analyze_esv3.py              offline reports: stage tables, go / no-go, every comparison
 │   ├── tests/smoke_test_offline.py  end-to-end check on all three benchmarks with a fake client, no API calls
 │   ├── tests/test_expression_answers.py  the expression scorer, incl. all 500 MATH-500 golds
@@ -339,6 +340,8 @@ python experiments/run_esv3.py --benchmark $B \
     --models qwen/qwen-2.5-7b-instruct mistralai/mistral-nemo google/gemma-3-4b-it   # 4a. self-check + USC control
 python experiments/run_esv3.py --benchmark $B --verifier-model openai/gpt-oss-120b \
     --models qwen/qwen-2.5-7b-instruct mistralai/mistral-nemo google/gemma-3-4b-it   # 4b. independent check
+python experiments/run_esv3.py --benchmark $B --verifier-model openai/gpt-oss-120b --judge-select \
+    --models qwen/qwen-2.5-7b-instruct mistralai/mistral-nemo google/gemma-3-4b-it   # 4c. structure control
 python experiments/analyze_esv3.py --benchmark $B --models small --verifier-model openai/gpt-oss-120b
 ```
 

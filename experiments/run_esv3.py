@@ -48,7 +48,7 @@ import run_methods as rm  # noqa: E402
 V3_VERSION = "jee_esv3_v1_2026-11-03"
 # The decision is recomputed from the stored verdicts on every load, so changing it needs no calls.
 DECISION_RULE = "stages1-3_strict_v1_2026-11-03"
-METHODS = ("esv3", "usc")
+METHODS = ("esv3", "usc", "judge_select")  # judge_select only when --judge-select was passed
 
 
 def candidates_of(cot: List[Dict[str, Any]], answer_format: str) -> List[Dict[str, Any]]:
@@ -139,6 +139,38 @@ def usc_choice(call: Optional[Dict[str, Any]], cot: List[Dict[str, Any]],
 USC_SKIPPED = "not run in this condition: USC is a solver-only control, measured in esv3_records.json"
 
 
+def judge_choice(call: Optional[Dict[str, Any]], candidates: List[Dict[str, Any]],
+                 answer_format: Optional[str] = None) -> Tuple[Optional[int], Optional[str]]:
+    """The judge-select control's pick, as (index into candidates, how). Mirrors usc_choice, over the SAME distinct
+    candidates ESV saw rather than over the 4 raw samples, and with one extra outcome: the prompt lets the judge
+    reject every candidate, so an explicit NONE is a decision, not a parse failure.
+
+    how: "none" (declined every candidate - the counterpart of ESV's `none_sound`) | "label" | "value" |
+         "ambiguous" | "unresolved" (no usable selection; the caller falls back to the initial answer).
+    Only "none" and "unresolved" keep the initial answer, and they are reported apart because they mean
+    opposite things: a judgement that nothing holds up, versus no judgement at all.
+    """
+    if not call:
+        return None, None
+    raw = (((call.get("parsed") or {}).get("selected_solution")) or "").strip()
+    if re.fullmatch(r"(?i)\s*none\.?\s*", raw):
+        return None, "none"
+    match = re.search(r"\d+", raw)
+    index = int(match.group(0)) - 1 if match else -1
+    by_label = index if 0 <= index < len(candidates) else None
+    by_value = None
+    if answer_format and raw:
+        picked = normalize_answer(raw, answer_format)
+        hits = [i for i, c in enumerate(candidates) if c["normalized"] and picked
+                and answers_match(picked, c["normalized"], answer_format)]
+        by_value = hits[0] if len(hits) == 1 else None  # candidates are distinct, so a value names at most one
+    if by_label is None:
+        return (by_value, "value") if by_value is not None else (None, "unresolved")
+    if by_value is None or by_label == by_value:
+        return by_label, "label"
+    return by_label, "ambiguous"  # the tag asked for a label, so the label wins; reported separately
+
+
 def redecide(record: Dict[str, Any]) -> Dict[str, Any]:
     """Recomputes both finals from the stored calls under DECISION_RULE (no calls)."""
     fmt_, gold, init = record["answer_format"], record["gold"], record["initial"]
@@ -161,6 +193,12 @@ def redecide(record: Dict[str, Any]) -> Dict[str, Any]:
         # `unresolved` keeps the initial answer, which is USC's documented fallback - but it makes USC look exactly
         # like CoT maj@4, so analyze_esv3.py reports the rate instead of letting it pass unseen.
         u.update(final_fields(gold, fmt_, init, record["cot_answers"][pick]["answer"] if pick is not None else None))
+    # The judge-select control is opt-in (--judge-select), so most records simply do not carry the arm.
+    j = record["methods"].get("judge_select")
+    if j is not None:
+        pick, how = judge_choice(j["call"], cands, fmt_)
+        j["chosen"], j["selection"] = pick, how
+        j.update(final_fields(gold, fmt_, init, cands[pick]["answer"] if pick is not None else None))
     record["decision_rule"] = DECISION_RULE
     return record
 
@@ -170,15 +208,41 @@ class V3Runner(rm.Runner):
     # independent checker separates right from wrong candidates better than the solver itself does.
     verifier_model: Optional[str] = None
     verifier_reasoning: Optional[Dict[str, Any]] = None
+    judge_select: bool = False  # also run the judge-select control, on the same candidates and the same checker
 
-    def verify_call(self, prompt: str, fields: List[str], required: List[str]) -> Dict[str, Any]:
+    def checker_call(self, stage: str, prompt: str, fields: List[str], required: List[str]) -> Dict[str, Any]:
+        """One call to whichever model is checking in this condition: the solver, or --verifier-model. ESV and the
+        judge-select control share it, so the two arms differ only by their prompt."""
         if not self.verifier_model:
-            return self.solver("esv3_verify", prompt, fields, required)
-        call = rm.call_stage(self.client, self.verifier_model, "esv3_verify", prompt, fields, required,
+            return self.solver(stage, prompt, fields, required)
+        call = rm.call_stage(self.client, self.verifier_model, stage, prompt, fields, required,
                              self.verifier_reasoning, common.solver_max_tokens())
         if rm.is_api_failure(call):
-            raise rm.ApiFailure(f"esv3_verify[{self.verifier_model}]: {call['errors'][-1] if call['errors'] else 'api error'}")
+            raise rm.ApiFailure(f"{stage}[{self.verifier_model}]: {call['errors'][-1] if call['errors'] else 'api error'}")
         return call
+
+    def verify_call(self, prompt: str, fields: List[str], required: List[str]) -> Dict[str, Any]:
+        return self.checker_call("esv3_verify", prompt, fields, required)
+
+    def judge_call(self, inst: Dict[str, Any], solutions: List[Dict[str, str]]) -> Dict[str, Any]:
+        fields = list(mp.judge_select_fields(len(solutions)))
+        return self.checker_call("judge_select", mp.build_judge_select_prompt(inst, solutions),
+                                 fields, ["selected_solution"])
+
+    @staticmethod
+    def solutions_for(cands: List[Dict[str, Any]], cot: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+        """One representative solution per distinct candidate, in order of first appearance. Shared by the ESV
+        prompt and the judge-select control so both see byte-identical candidate text."""
+        return [{"reasoning": cot[c["sample_index"]]["parsed"].get("reasoning", ""), "answer": c["answer"]} for c in cands]
+
+    def add_judge_select(self, record: Dict[str, Any], inst: Dict[str, Any],
+                         cot: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Add the judge-select arm to a record that already has its ESV verification call, without repeating it.
+        Unanimous instances need no call: every method keeps the majority answer there."""
+        cands = record["candidates"]
+        call = self.judge_call(inst, self.solutions_for(cands, cot)) if len(cands) >= 2 else None
+        record["methods"]["judge_select"] = {"call": call}
+        return redecide(record)
 
     def run(self, inst: Dict[str, Any], cot: List[Dict[str, Any]]) -> Dict[str, Any]:
         fmt_ = inst["answer_format"]
@@ -187,14 +251,16 @@ class V3Runner(rm.Runner):
         initial = {"context_sample": chosen, "answer": cot[chosen]["answer"], "normalized": start["normalized_answer"],
                    "correct": start["correct"]}
         cands = candidates_of(cot, fmt_)
-        verify = usc = None
+        verify = usc = judge = None
         checks: List[Dict[str, Any]] = []
         if len(cands) >= 2:
-            solutions = [{"reasoning": cot[c["sample_index"]]["parsed"].get("reasoning", ""), "answer": c["answer"]} for c in cands]
+            solutions = self.solutions_for(cands, cot)
             fields = list(mp.v3_verify_fields(len(cands)))
             verify = self.verify_call(mp.build_v3_verify_prompt(inst, solutions), fields,
                                       [f"s{i}_verdict" for i in range(1, len(cands) + 1)])
             checks = parse_checks(verify["parsed"], len(cands))
+            if self.judge_select:
+                judge = self.judge_call(inst, solutions)
             if not self.verifier_model:  # USC stays a self-model control; rerunning it would just duplicate records
                 responses = [{"reasoning": s["parsed"].get("reasoning", ""), "answer": s["answer"]} for s in cot]
                 usc = self.solver("usc", mp.build_usc_prompt(inst, responses), list(mp.USC_FIELDS), ["selected_response"])
@@ -206,7 +272,8 @@ class V3Runner(rm.Runner):
             "model": self.model, "verifier_model": self.verifier_model, "version": V3_VERSION, "initial": initial, "candidates": cands,
             "cot_answers": [{"answer": s["answer"], "normalized": s["normalized_answer"]} for s in cot],
             "methods": {"esv3": {"call": verify, "checks": checks},
-                        "usc": {"call": usc, **({"skipped": USC_SKIPPED} if self.verifier_model and len(cands) >= 2 else {})}},
+                        "usc": {"call": usc, **({"skipped": USC_SKIPPED} if self.verifier_model and len(cands) >= 2 else {})},
+                        **({"judge_select": {"call": judge}} if self.judge_select else {})},
         }
         return redecide(record)
 
@@ -223,7 +290,12 @@ def run_model(client, model: str, pairs: List[Dict[str, Any]], args) -> None:
     untouched = {iid: r for iid, r in saved.items() if iid not in by_id}
     missing = [iid for iid in by_id if any(s is None for s in (base.get(iid) or {}).get("samples", {}).get("cot", [None]))]
     todo = [iid for iid in by_id if iid not in records and iid not in missing]
+    # --judge-select is additive: a record that already has its ESV call only needs the control's one extra call,
+    # so it is topped up in place rather than re-run. Re-running would pay for the verification call twice.
+    topup = ([iid for iid in by_id
+              if iid in records and "judge_select" not in records[iid]["methods"]] if args.judge_select else [])
     print(f"\n=== {model} | {len(instances)} instances | done {len(records)} | to run {len(todo)}"
+          + (f" | {len(topup)} to top up with judge-select" if topup else "")
           + (f" | {len(missing)} skipped: CoT samples incomplete (run run_methods.py --samples-only first)" if missing else ""), flush=True)
 
     metadata = {"model": model, "verifier_model": args.verifier_model, "version": V3_VERSION,
@@ -239,11 +311,16 @@ def run_model(client, model: str, pairs: List[Dict[str, Any]], args) -> None:
     runner = V3Runner(client, model, reasoning_setting(args.reasoning))
     runner.verifier_model = args.verifier_model
     runner.verifier_reasoning = reasoning_setting(args.verifier_reasoning)
+    runner.judge_select = args.judge_select
+
+    existing = dict(records)  # snapshot: worker threads must not read `records` while others write to it
 
     def job(iid: str) -> Optional[Dict[str, Any]]:
         if rm.STOP.is_set():
             return None
         try:
+            if iid in existing:  # top-up: the ESV call is already stored, only the control is missing
+                return runner.add_judge_select(existing[iid], by_id[iid], base[iid]["samples"]["cot"])
             return runner.run(by_id[iid], base[iid]["samples"]["cot"])
         except rm.ApiFailure as exc:
             print(f"    API failure ({exc}); will retry on the next run", flush=True)
@@ -252,8 +329,9 @@ def run_model(client, model: str, pairs: List[Dict[str, Any]], args) -> None:
         return None
 
     yn = lambda ok: "Y" if ok else "N"
+    queue = todo + topup
     with ThreadPoolExecutor(max(1, args.workers)) as ex:
-        futures = {ex.submit(job, iid): iid for iid in todo}
+        futures = {ex.submit(job, iid): iid for iid in queue}
         for done, fut in enumerate(as_completed(futures), start=1):
             out = fut.result()
             if out is None:
@@ -262,10 +340,12 @@ def run_model(client, model: str, pairs: List[Dict[str, Any]], args) -> None:
                 records[out["instance_id"]] = out
                 save()
             e, u = out["methods"]["esv3"], out["methods"]["usc"]
+            j = out["methods"].get("judge_select")
             answers = "/".join(f"{c['normalized']}x{c['votes']}" for c in out["candidates"]) or "-"
-            print(f"  [{done}/{len(todo)}] {out['instance_id']}: candidates {answers} initial={out['initial']['normalized']} "
+            print(f"  [{done}/{len(queue)}] {out['instance_id']}: candidates {answers} initial={out['initial']['normalized']} "
                   f"{yn(out['initial']['correct'])} | esv3 {e['decision']} -> {e['final_normalized']} {yn(e['final_correct'])} | "
-                  f"usc -> {u['final_normalized']} {yn(u['final_correct'])}", flush=True)
+                  f"usc -> {u['final_normalized']} {yn(u['final_correct'])}"
+                  + (f" | judge {j['selection']} -> {j['final_normalized']} {yn(j['final_correct'])}" if j else ""), flush=True)
     save(force=True)
 
 
@@ -277,6 +357,11 @@ def main(argv: Optional[List[str]] = None, client=None) -> int:
     parser.add_argument("--verifier-model", default=None,
                         help="Check the candidates with THIS model instead of the solver itself (independent verification)")
     parser.add_argument("--verifier-reasoning", default="medium", choices=["default", "off", "low", "medium", "high"])
+    parser.add_argument("--judge-select", action="store_true",
+                        help="Also run the judge-select control: the same checker on the same candidates, asked to "
+                             "reason freely and pick one (or NONE) instead of filling in ESV's structured form. "
+                             "Isolates ESV's structure from the checker's capability. Adds one call per disagreeing "
+                             "instance; records that already exist are topped up without repeating the ESV call")
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--limit-pairs", type=int, default=None)
     args = parser.parse_args(argv)

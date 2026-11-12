@@ -66,6 +66,7 @@ ESV targets the *trap*: the answer the original strategy S yields when applied b
 | CoT maj@4 (initial) | 91.0% |  |  |  |  |
 | CoT pass@4 (oracle choice) | 94.9% |  |  |  |  |
 | Universal Self-Consistency | 90.8% | 2 | 3 | -1 (p=1.000) | 2 / 0.19 |
+| Judge-select (same checker, no ESV form) | 94.6% | 14 | 0 | +14 (p=1e-04) | 127 / 0.19 |
 | ESV v3 (stages 1-3) | 94.6% | 14 | 0 | +14 (p=1e-04) | 391 / 0.19 |
 
 **mistralai/mistral-nemo** (390 instances)
@@ -77,6 +78,7 @@ ESV targets the *trap*: the answer the original strategy S yields when applied b
 | CoT maj@4 (initial) | 84.4% |  |  |  |  |
 | CoT pass@4 (oracle choice) | 94.4% |  |  |  |  |
 | Universal Self-Consistency | 85.9% | 11 | 5 | +6 (p=0.210) | 4 / 0.42 |
+| Judge-select (same checker, no ESV form) | 93.3% | 36 | 1 | +35 (p=6e-10) | 291 / 0.42 |
 | ESV v3 (stages 1-3) | 92.8% | 35 | 2 | +33 (p=1e-08) | 824 / 0.42 |
 
 **google/gemma-3-4b-it** (390 instances)
@@ -88,6 +90,7 @@ ESV targets the *trap*: the answer the original strategy S yields when applied b
 | CoT maj@4 (initial) | 90.0% |  |  |  |  |
 | CoT pass@4 (oracle choice) | 94.4% |  |  |  |  |
 | Universal Self-Consistency | 91.3% | 6 | 1 | +5 (p=0.125) | 3 / 0.17 |
+| Judge-select (same checker, no ESV form) | 94.4% | 17 | 0 | +17 (p=2e-05) | 128 / 0.17 |
 | ESV v3 (stages 1-3) | 93.1% | 12 | 0 | +12 (p=5e-04) | 357 / 0.17 |
 
 **Pooled** (1170 instances)
@@ -99,6 +102,7 @@ ESV targets the *trap*: the answer the original strategy S yields when applied b
 | CoT maj@4 (initial) | 88.5% |  |  |  |  |
 | CoT pass@4 (oracle choice) | 94.5% |  |  |  |  |
 | Universal Self-Consistency | 89.3% | 19 | 9 | +10 (p=0.087) | 3 / 0.26 |
+| Judge-select (same checker, no ESV form) | 94.1% | 67 | 1 | +66 (p=5e-19) | 182 / 0.26 |
 | ESV v3 (stages 1-3) | 93.5% | 61 | 2 | +59 (p=4e-16) | 524 / 0.26 |
 
 ESV v3 vs USC (ESV-only / USC-only right, McNemar p): 53 / 4 (p=6e-12)
@@ -155,6 +159,51 @@ USC names its pick in one tag. Where that tag cannot be resolved to a response, 
 | breaking | 297 | 79.1% | 79.8% | 87.5% | 25 / 0 |
 | preserving | 297 | 93.6% | 94.6% | 97.6% | 13 / 1 |
 
+## The judge-select control: is it the structure, or the checker?
+
+Judge-select asks the **same checker** to read the **same candidates** in the same order with the same vote counts hidden, reason freely in its own words, and name one solution or NONE. Everything is held fixed except ESV's form (bindings / conditions / divergence / verdict per candidate). It keeps the licence to reject every candidate, so ESV gets no free win from its `none_sound` branch, and it is given room to reason, so this is structured reasoning versus unstructured reasoning rather than versus no thinking at all.
+
+**ESV v3 vs judge-select, paired over all 1170 instances: 0 / 7 (McNemar p=0.016).**
+
+| Method | accuracy | fixes | breaks | net vs CoT maj@4 | extra completion tokens / calls per instance |
+|---|---|---|---|---|---|
+| Direct QA maj@4 | 12.1% | 7 | 900 | -893 (p=2e-256) |  |
+| CoT pass@1 | 85.1% |  |  |  |  |
+| CoT maj@4 (initial) | 88.5% |  |  |  |  |
+| CoT pass@4 (oracle choice) | 94.5% |  |  |  |  |
+| Universal Self-Consistency | 89.3% | 19 | 9 | +10 (p=0.087) | 3 / 0.26 |
+| Judge-select (same checker, no ESV form) | 94.1% | 67 | 1 | +66 (p=5e-19) | 182 / 0.26 |
+| ESV v3 (stages 1-3) | 93.5% | 61 | 2 | +59 (p=4e-16) | 524 / 0.26 |
+
+### Where the two differ (disagreeing instances only)
+
+Stratified by what ESV decided, because the hypothesis is specific: the form should matter least where one candidate is clearly sound, and most where none survives and judge-select has to commit anyway.
+
+| ESV's decision | n | CoT maj@4 | judge-select | ESV v3 | oracle | ESV-only / judge-only right |
+|---|---|---|---|---|---|---|
+| one_sound | 231 | 70.6% | 97.0% | 96.1% | 97.8% | 0 / 2 (p=0.500) |
+| none_sound | 72 | 30.6% | 37.5% | 30.6% | 41.7% | 0 / 5 (p=0.062) |
+
+### Selection quality on the disagreeing instances
+
+|  | correct |
+|---|---|
+| CoT maj@4 (initial) | 61.1% |
+| Universal Self-Consistency | 64.4% |
+| Judge-select (same checker, no ESV form) | 82.8% |
+| ESV v3 (stages 1-3) | 80.5% |
+| CoT pass@4 (oracle choice) | 84.5% |
+
+### What judge-select actually returned
+
+`none` is a judgement that no candidate holds up - the counterpart of ESV's `none_sound`. `unresolved` is a tag that named nothing usable; both keep the initial answer, but only the first is a decision, so they are reported apart.
+
+| selection | instances | correct |
+|---|---|---|
+| label | 255/303 (84.2%) | 96.5% |
+| none | 46/303 (15.2%) | 6.5% |
+| ambiguous | 2/303 (0.7%) | 100.0% |
+
 ## Compute cost
 
 Read off the `usage` and `latency_seconds` stored on every call, so this section is reproducible offline from the records. Every method starts from the same 4 CoT samples and adds at most one call, so the baseline is shared and only the extra call separates them. **serial** is billed compute time; **critical path** is what a user waits for, since `run_methods.py` issues the 4 samples concurrently while the extra call cannot start until all 4 are back.
@@ -165,6 +214,7 @@ Read off the `usage` and `latency_seconds` stored on every call, so this section
 | CoT pass@1 | 85.1% | 1.00 | 595 | - | 595 | -75.0% | 4.8 | 4.8 |
 | CoT maj@4 (initial) | 88.5% | 4.00 | 2,379 | - | 2,379 | +0.0% | 19.2 | 6.5 |
 | Universal Self-Consistency | 89.3% | 4.26 | 2,799 | - | 2,799 | +17.6% | 19.4 | 6.7 |
+| Judge-select (same checker, no ESV form) | 94.1% | 4.26 | 2,379 | 492 | 2,871 | +20.7% | 22.7 | 10.0 |
 | ESV v3 (stages 1-3) | 93.5% | 4.26 | 2,379 | 1,038 | 3,417 | +43.6% | 26.4 | 13.7 |
 | CoT pass@4 (oracle choice) | 94.5% | 4.00 | 2,379 | - | 2,379 | +0.0% | 19.2 | 6.5 |
 
@@ -174,6 +224,7 @@ Read off the `usage` and `latency_seconds` stored on every call, so this section
 |---|---|---|---|---|---|---|---|
 | Direct QA maj@4 | -76.3 pp | 7 / 900 | -893 | p=2e-256 | -1,284 | -5.5 s | no net gain |
 | Universal Self-Consistency | +0.9 pp | 19 / 9 | +10 | p=0.087 | +420 | +0.2 s | 49,112 |
+| Judge-select (same checker, no ESV form) | +5.6 pp | 67 / 1 | +66 | p=5e-19 | +492 | +3.5 s | 8,727 |
 | ESV v3 (stages 1-3) | +5.0 pp | 61 / 2 | +59 | p=4e-16 | +1,038 | +7.2 s | 20,585 |
 | CoT pass@4 (oracle choice) | +6.1 pp | 71 / 0 | +71 | p=8e-22 | +0 | +0.0 s | 0 |
 
