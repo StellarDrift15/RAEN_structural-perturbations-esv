@@ -130,13 +130,55 @@ USC names its pick in one tag. Where that tag cannot be resolved to a response, 
 
 `none_sound` is where stage 4 would act; `a candidate is right` there is its ceiling.
 
-### By arm (pooled)
+### By arm
+
+Accuracy on the untouched originals, on strategy-preserving P' and on strategy-breaking P', per model and pooled. ESV's premise is that the breaking arm is where a selector has the most to recover, so the fixes / breaks column is read per arm.
+
+**mistralai/mistral-nemo**
+
+| arm | n | CoT maj@4 (initial) | Universal Self-Consistency | ESV v3 (stages 1-3) | ESV v3 fixes / breaks |
+|---|---|---|---|---|---|
+| original | 244 | 46.3% | 47.5% | 45.5% | 14 / 16 |
+| breaking | 123 | 31.7% | 29.3% | 25.2% | 3 / 11 |
+| preserving | 121 | 57.0% | 53.7% | 52.1% | 4 / 10 |
+
+**google/gemma-3-4b-it**
+
+| arm | n | CoT maj@4 (initial) | Universal Self-Consistency | ESV v3 (stages 1-3) | ESV v3 fixes / breaks |
+|---|---|---|---|---|---|
+| original | 244 | 68.9% | 69.7% | 67.2% | 3 / 7 |
+| breaking | 123 | 56.1% | 60.2% | 54.5% | 1 / 3 |
+| preserving | 121 | 76.0% | 76.9% | 76.0% | 3 / 3 |
+
+**Pooled**
 
 | arm | n | CoT maj@4 (initial) | Universal Self-Consistency | ESV v3 (stages 1-3) | ESV v3 fixes / breaks |
 |---|---|---|---|---|---|
 | original | 488 | 57.6% | 58.6% | 56.4% | 17 / 23 |
 | breaking | 246 | 43.9% | 44.7% | 39.8% | 4 / 14 |
 | preserving | 242 | 66.5% | 65.3% | 64.0% | 7 / 13 |
+
+### Decisions, per model
+
+The same decision mix as above, split by model: a checker that almost never returns `one_sound` is abstaining, not selecting.
+
+**mistralai/mistral-nemo**
+
+| decision | n | CoT maj@4 | ESV v3 | fixes | breaks | a candidate is right |
+|---|---|---|---|---|---|---|
+| unanimous | 97 | 95.9% | 95.9% | 0 | 0 | 93 |
+| one_sound | 216 | 38.0% | 33.8% | 20 | 29 | 129 |
+| several_sound | 146 | 23.3% | 18.5% | 1 | 8 | 57 |
+| none_sound | 29 | 41.4% | 41.4% | 0 | 0 | 15 |
+
+**google/gemma-3-4b-it**
+
+| decision | n | CoT maj@4 | ESV v3 | fixes | breaks | a candidate is right |
+|---|---|---|---|---|---|---|
+| unanimous | 278 | 96.0% | 96.0% | 0 | 0 | 267 |
+| one_sound | 79 | 31.6% | 24.1% | 5 | 11 | 37 |
+| several_sound | 94 | 29.8% | 29.8% | 2 | 2 | 53 |
+| none_sound | 37 | 24.3% | 24.3% | 0 | 0 | 20 |
 
 ## Compute cost
 

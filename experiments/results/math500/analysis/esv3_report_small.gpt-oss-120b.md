@@ -136,13 +136,56 @@ USC names its pick in one tag. Where that tag cannot be resolved to a response, 
 
 `none_sound` is where stage 4 would act; `a candidate is right` there is its ceiling.
 
-### By arm (pooled)
+### By arm
+
+Accuracy on the untouched originals, on strategy-preserving P' and on strategy-breaking P', per model and pooled. ESV's premise is that the breaking arm is where a selector has the most to recover, so the fixes / breaks column is read per arm.
+
+**mistralai/mistral-nemo**
+
+| arm | n | CoT maj@4 (initial) | Universal Self-Consistency | ESV v3 (stages 1-3) | ESV v3 fixes / breaks |
+|---|---|---|---|---|---|
+| original | 244 | 46.3% | 47.5% | 54.1% | 19 / 0 |
+| breaking | 123 | 31.7% | 29.3% | 35.8% | 6 / 1 |
+| preserving | 121 | 57.0% | 53.7% | 62.8% | 7 / 0 |
+
+**google/gemma-3-4b-it**
+
+| arm | n | CoT maj@4 (initial) | Universal Self-Consistency | ESV v3 (stages 1-3) | ESV v3 fixes / breaks |
+|---|---|---|---|---|---|
+| original | 244 | 68.9% | 69.7% | 74.6% | 14 / 0 |
+| breaking | 123 | 56.1% | 60.2% | 64.2% | 10 / 0 |
+| preserving | 121 | 76.0% | 76.9% | 78.5% | 3 / 0 |
+
+**Pooled**
 
 | arm | n | CoT maj@4 (initial) | Universal Self-Consistency | ESV v3 (stages 1-3) | ESV v3 fixes / breaks |
 |---|---|---|---|---|---|
 | original | 488 | 57.6% | 58.6% | 64.3% | 33 / 0 |
 | breaking | 246 | 43.9% | 44.7% | 50.0% | 16 / 1 |
 | preserving | 242 | 66.5% | 65.3% | 70.7% | 10 / 0 |
+
+### Decisions, per model
+
+The same decision mix as above, split by model: a checker that almost never returns `one_sound` is abstaining, not selecting.
+
+**mistralai/mistral-nemo**
+
+| decision | n | CoT maj@4 | ESV v3 | fixes | breaks | a candidate is right |
+|---|---|---|---|---|---|---|
+| unanimous | 97 | 95.9% | 95.9% | 0 | 0 | 93 |
+| one_sound | 122 | 68.9% | 94.3% | 32 | 1 | 118 |
+| several_sound | 7 | 71.4% | 71.4% | 0 | 0 | 6 |
+| none_sound | 262 | 14.9% | 14.9% | 0 | 0 | 77 |
+
+**google/gemma-3-4b-it**
+
+| decision | n | CoT maj@4 | ESV v3 | fixes | breaks | a candidate is right |
+|---|---|---|---|---|---|---|
+| unanimous | 278 | 96.0% | 96.0% | 0 | 0 | 267 |
+| one_sound | 65 | 41.5% | 80.0% | 25 | 0 | 53 |
+| several_sound | 27 | 29.6% | 37.0% | 2 | 0 | 17 |
+| none_sound | 117 | 23.1% | 23.1% | 0 | 0 | 39 |
+| unreadable | 1 | 0.0% | 0.0% | 0 | 0 | 1 |
 
 ## The judge-select control: is it the structure, or the checker?
 
