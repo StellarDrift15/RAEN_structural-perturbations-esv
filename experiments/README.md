@@ -114,8 +114,20 @@ Starts from the 4 CoT samples already in `records.json`; it never re-solves.
    answer (stage 4, diagnosis-driven repair, is not built).
 
 The gold answer is used only to score, never in a decision — so the comparison against CoT maj@4 is fair:
-every method starts from the same answer and can fix a wrong one or break a right one. **Control:**
-Universal Self-Consistency (Chen et al., 2023) on the same samples and the same gate.
+every method starts from the same answer and can fix a wrong one or break a right one.
+
+**Two controls, each isolating a different alternative explanation.**
+
+*Universal Self-Consistency* (Chen et al., 2023) — the solver, its own 4 samples with duplicates shown, one
+"select the most consistent response" call. It asks whether a free majority vote already captures the gain.
+
+*Judge-select* (`run_esv3.py --judge-select`) — the **same checker** as ESV, the **same** distinct candidates in
+the same order, vote counts hidden, asked to reason in its own words and name one solution or NONE. Everything
+is held fixed except ESV's structured form. It asks the question a reviewer will: under `--verifier-model` ESV
+adds a stronger model to the pipeline, so is the gain the protocol or just that model looking at the
+candidates? Two deliberate choices make it harder for ESV to beat: NONE is allowed, so judge-select keeps ESV's
+ability to decline (the `none_sound` branch), and a free-form `reasoning` tag comes first, so the comparison is
+structured reasoning versus unstructured reasoning rather than versus no thinking at all.
 
 ## Files
 
@@ -126,9 +138,9 @@ Universal Self-Consistency (Chen et al., 2023) on the same samples and the same 
 | `expression_answers.py` | normalization and equivalence for the `expression` answer format (MATH-500's LaTeX answers) |
 | `perturb_prompts.py` | generator / verifier prompts for both perturbation modes, format-preserving |
 | `build_dataset.py` | sample the benchmark's `n` problems, two-stage perturbation with the mode balancer -> `data/<benchmark>/frozen_dataset.json` |
-| `method_prompts.py` | the Direct QA, CoT, ESV v3 and USC prompts |
+| `method_prompts.py` | the Direct QA, CoT, ESV v3, USC and judge-select prompts |
 | `run_methods.py` | the 4 Direct QA + 4 CoT samples every method starts from |
-| `run_esv3.py` | ESV v3 and the USC control; `--verifier-model` for the independent checker |
+| `run_esv3.py` | ESV v3 and its controls; `--verifier-model` for the independent checker, `--judge-select` for the structure control (added to existing records without repeating the ESV call) |
 | `analyze_esv3.py` | the stage-by-stage report, the go / no-go line, every comparison table and the **Compute cost** section (calls, solver vs verifier tokens, serial and critical-path latency, tokens per net fix) |
 | `tests/smoke_test_offline.py` | every step on all three benchmarks against a fake model client, no API calls |
 | `tests/test_expression_answers.py` | the `expression` normalizer and matcher, incl. all 500 MATH-500 golds |
@@ -148,6 +160,9 @@ python experiments/build_dataset.py --benchmark $B           #    then every sam
 python experiments/run_methods.py --benchmark $B --models <small solvers>   # 3. the 4 DQA + 4 CoT samples
 python experiments/analyze_esv3.py --benchmark $B --models small            #    stage 1 only: headroom + trap rate
 python experiments/run_esv3.py --benchmark $B --verifier-model openai/gpt-oss-120b --models <small solvers>
+python experiments/run_esv3.py --benchmark $B --verifier-model openai/gpt-oss-120b --judge-select --models <small solvers>
+                                                            #    the structure control, one extra call per
+                                                            #    disagreeing instance; re-run adds only what is missing
 python experiments/analyze_esv3.py --benchmark $B --models small --verifier-model openai/gpt-oss-120b
 ```
 

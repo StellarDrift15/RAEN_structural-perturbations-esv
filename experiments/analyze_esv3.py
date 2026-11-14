@@ -34,7 +34,8 @@ ARMS = ("original", "breaking", "preserving")
 # Fixed before the 30-pair dev run (2026-11-03): ESV v3 must beat CoT maj@4 by >= 3 pp AND beat USC.
 GO_MARGIN_PP = 3.0
 LABELS = {"dqa_maj": "Direct QA maj@4", "cot_pass1": "CoT pass@1", "cot_maj": "CoT maj@4 (initial)", "cot_pass4": "CoT pass@4 (oracle choice)",
-          "usc": "Universal Self-Consistency", "esv3": "ESV v3 (stages 1-3)"}
+          "usc": "Universal Self-Consistency", "judge_select": "Judge-select (same checker, no ESV form)",
+          "esv3": "ESV v3 (stages 1-3)"}
 
 
 def pct(n: float, d: int) -> str:
@@ -182,6 +183,17 @@ def load(models, limit_pairs, v3_file: str = "esv3_records.json", min_pair=None,
                     esv3=method_cost(sample_cost(base[i]["samples"]["cot"]), call_cost(echeck),
                                      extra_is_verifier=bool(echeck) and echeck.get("model") != model),
                     usc=method_cost(sample_cost(base[i]["samples"]["cot"]), call_cost(u["call"])))
+                # The judge-select control is opt-in, so it is present only in records run with --judge-select.
+                judge = r["methods"].get("judge_select")
+                if judge is not None:
+                    jcall = judge["call"]
+                    row["judge_selection"] = judge.get("selection")
+                    row["correct"]["judge_select"] = bool(judge["final_correct"])
+                    row["tokens"]["judge_select"] = tokens(jcall)
+                    row["calls"]["judge_select"] = int(jcall is not None)
+                    row["cost"]["judge_select"] = method_cost(
+                        sample_cost(base[i]["samples"]["cot"]), call_cost(jcall),
+                        extra_is_verifier=bool(jcall) and jcall.get("model") != model)
             rows.append(row)
         if rows:
             per_model[model] = rows
@@ -415,7 +427,7 @@ def format_breakdown(rows: List[Dict[str, Any]], keys) -> str:
 # Compute cost. Every number below is read from the `usage` and `latency_seconds` that common.call_stage stored on
 # each call, so the whole section is reproducible offline from the records with no API calls.
 # ---------------------------------------------------------------------------
-COST_METHODS = ("dqa_maj", "cot_pass1", "cot_maj", "usc", "esv3", "cot_pass4")
+COST_METHODS = ("dqa_maj", "cot_pass1", "cot_maj", "usc", "judge_select", "esv3", "cot_pass4")
 
 
 def mean_cost(rows: List[Dict[str, Any]], key: str) -> Optional[Dict[str, float]]:
@@ -541,6 +553,57 @@ def price_sensitivity(rows: List[Dict[str, Any]], verifier_model: Optional[str])
     return out
 
 
+def judge_select_section(rows: List[Dict[str, Any]]) -> List[str]:
+    """The judge-select control: same checker, same candidates, same hidden votes, same licence to reject them all
+    and the same room to reason - only ESV's structured form is removed. It answers the one question the headline
+    result cannot: is the gain the protocol, or just a stronger model looking at the candidates?"""
+    if not all("judge_select" in r["correct"] for r in rows):
+        return []
+    dis = [r for r in rows if r["calls"].get("esv3")]
+    wins, losses, p = paired(rows, "esv3", "judge_select")
+    out = ["## The judge-select control: is it the structure, or the checker?", "",
+           "Judge-select asks the **same checker** to read the **same candidates** in the same order with the same "
+           "vote counts hidden, reason freely in its own words, and name one solution or NONE. Everything is held "
+           "fixed except ESV's form (bindings / conditions / divergence / verdict per candidate). It keeps the "
+           "licence to reject every candidate, so ESV gets no free win from its `none_sound` branch, and it is "
+           "given room to reason, so this is structured reasoning versus unstructured reasoning rather than "
+           "versus no thinking at all.", "",
+           f"**ESV v3 vs judge-select, paired over all {len(rows)} instances: {wins} / {losses} (McNemar p={p}).**", "",
+           accuracy_table(rows), "",
+           "### Where the two differ (disagreeing instances only)", "",
+           "Stratified by what ESV decided, because the hypothesis is specific: the form should matter least where "
+           "one candidate is clearly sound, and most where none survives and judge-select has to commit anyway.", ""]
+    strata = []
+    for branch in ("one_sound", "several_sound", "none_sound", "unreadable"):
+        sub = [r for r in dis if r["v3"]["methods"]["esv3"]["decision"] == branch]
+        if not sub:
+            continue
+        w, l, pp = paired(sub, "esv3", "judge_select")
+        strata.append([branch, len(sub),
+                       rate(sum(r["correct"]["cot_maj"] for r in sub), len(sub)),
+                       rate(sum(r["correct"]["judge_select"] for r in sub), len(sub)),
+                       rate(sum(r["correct"]["esv3"] for r in sub), len(sub)),
+                       rate(sum(r["correct"]["cot_pass4"] for r in sub), len(sub)),
+                       f"{w} / {l} (p={pp})"])
+    out += [table(["ESV's decision", "n", "CoT maj@4", "judge-select", "ESV v3", "oracle",
+                   "ESV-only / judge-only right"], strata), "",
+            "### Selection quality on the disagreeing instances", "",
+            table(["", "correct"],
+                  [[LABELS[k], rate(sum(r["correct"][k] for r in dis), len(dis))]
+                   for k in ("cot_maj", "usc", "judge_select", "esv3", "cot_pass4") if k in dis[0]["correct"]]), "",
+            "### What judge-select actually returned", "",
+            "`none` is a judgement that no candidate holds up - the counterpart of ESV's `none_sound`. "
+            "`unresolved` is a tag that named nothing usable; both keep the initial answer, but only the first is "
+            "a decision, so they are reported apart.", "",
+            table(["selection", "instances", "correct"],
+                  [[how or "(no call)", pct(len(sub), len(dis)),
+                    rate(sum(r["correct"]["judge_select"] for r in sub), len(sub))]
+                   for how, sub in sorted(
+                       ((h, [r for r in dis if r.get("judge_selection") == h])
+                        for h in {r.get("judge_selection") for r in dis}), key=lambda kv: -len(kv[1])) if sub]), ""]
+    return out
+
+
 def go_no_go(rows: List[Dict[str, Any]]) -> str:
     n = len(rows)
     d_maj = 100 * (sum(r["correct"]["esv3"] for r in rows) - sum(r["correct"]["cot_maj"] for r in rows)) / n
@@ -553,7 +616,11 @@ def go_no_go(rows: List[Dict[str, Any]]) -> str:
 def main(argv: List[str] = None) -> int:
     parser = argparse.ArgumentParser(description="ESV v3 stage-by-stage report.")
     common.add_benchmark_arg(parser)
-    parser.add_argument("--models", choices=list(MODEL_SETS), default="large")
+    parser.add_argument("--models", nargs="+", default=["large"],
+                        help="A preset (" + ", ".join(MODEL_SETS) + ") or explicit model ids, e.g. "
+                             "--models mistralai/mistral-nemo google/gemma-3-4b-it. Explicit ids let the report "
+                             "cover only the solvers that have ESV records, and let a benchmark be re-scored on "
+                             "the solver subset another benchmark shares.")
     parser.add_argument("--limit-pairs", type=int, default=None, help="stage 1 only, before run_esv3.py has run")
     parser.add_argument("--verifier-model", default=None,
                         help="Read the ESV v3 arm from the esv3_records.<verifier>.json written by run_esv3.py "
@@ -565,10 +632,17 @@ def main(argv: List[str] = None) -> int:
     args = parser.parse_args(argv)
     common.select_benchmark(args.benchmark)
     vslug = model_slug(args.verifier_model) if args.verifier_model else None
-    per_model = load(MODEL_SETS[args.models], args.limit_pairs, f"esv3_records.{vslug}.json" if vslug else "esv3_records.json",
+    if len(args.models) == 1 and args.models[0] in MODEL_SETS:
+        models, models_label = MODEL_SETS[args.models[0]], f"{args.models[0]} models"
+        models_tag = args.models[0]
+    else:
+        models = args.models
+        models_label = "models " + ", ".join(model_slug(m) for m in models)
+        models_tag = "+".join(model_slug(m) for m in models)
+    per_model = load(models, args.limit_pairs, f"esv3_records.{vslug}.json" if vslug else "esv3_records.json",
                      args.min_pair, args.max_pair, usc_file="esv3_records.json" if vslug else None)
     if not per_model:
-        print(f"No records.json for the {args.models} models.", file=sys.stderr)
+        print(f"No records.json for the {models_label}.", file=sys.stderr)
         return 2
     pooled = [r for rows in per_model.values() for r in rows]
     disputed = common.DISPUTED_INSTANCES.get(common.BENCHMARK, frozenset())
@@ -579,7 +653,7 @@ def main(argv: List[str] = None) -> int:
         verifier_note += f", HELD-OUT pairs >= {args.min_pair}"
     if args.max_pair is not None:
         verifier_note += f", DEV pairs < {args.max_pair}"
-    out = [f"# ESV v3, stage by stage ({common.benchmark_info()['label']}, {args.models} models{verifier_note})", "",
+    out = [f"# ESV v3, stage by stage ({common.benchmark_info()['label']}, {models_label}{verifier_note})", "",
            f"Version `{V3_VERSION}`, decision rule `{DECISION_RULE}`. Gold is used only to score. Design and motivation: "
            "`esv_bottleneck_analysis.md`.", "",
            *([f"The ESV v3 arm is verified by {args.verifier_model}; the USC arm is read from `esv3_records.json`, "
@@ -613,7 +687,19 @@ def main(argv: List[str] = None) -> int:
                 "### Stages 2-3 as a detector, per candidate (pooled)", "", candidate_table(pooled), "", check_table(pooled), "",
                 "### Decisions (pooled)", "", decision_table(pooled), "",
                 "`none_sound` is where stage 4 would act; `a candidate is right` there is its ceiling.", "",
-                "### By arm (pooled)", "", breakdown(pooled, ("cot_maj", "usc", "esv3")), ""]
+                "### By arm", "",
+                "Accuracy on the untouched originals, on strategy-preserving P' and on strategy-breaking P', per "
+                "model and pooled. ESV's premise is that the breaking arm is where a selector has the most to "
+                "recover, so the fixes / breaks column is read per arm.", ""]
+        for model, rows in per_model.items():
+            out += [f"**{model}**", "", breakdown(rows, ("cot_maj", "usc", "esv3")), ""]
+        out += ["**Pooled**", "", breakdown(pooled, ("cot_maj", "usc", "esv3")), "",
+                "### Decisions, per model", "",
+                "The same decision mix as above, split by model: a checker that almost never returns "
+                "`one_sound` is abstaining, not selecting.", ""]
+        for model, rows in per_model.items():
+            out += [f"**{model}**", "", decision_table(rows), ""]
+        out += judge_select_section(pooled)
         out += ["## Compute cost", "",
                 "Read off the `usage` and `latency_seconds` stored on every call, so this section is reproducible "
                 "offline from the records. Every method starts from the same 4 CoT samples and adds at most one "
@@ -640,7 +726,7 @@ def main(argv: List[str] = None) -> int:
                     "`expression` answers are compared by LaTeX normalization and symbolic equivalence "
                     "(`expression_answers.py`) rather than by exact match, so this split is the check that the "
                     "scoring is not what separates the methods.", "", by_format, ""]
-    name = "esv3_report.md" if args.models == "large" else f"esv3_report_{args.models}.md"
+    name = "esv3_report.md" if models_tag == "large" else f"esv3_report_{models_tag}.md"
     if vslug:
         name = name[:-3] + f".{vslug}.md"
     if args.min_pair is not None:

@@ -123,6 +123,18 @@ class FakeCompletions:
             return tags(**out)
         if "Select the most consistent response" in prompt:  # Universal Self-Consistency control
             return tags(selected_response=f"Response {rng.randint(1, 4)}")
+        if "You are judging several solutions" in prompt:  # judge-select control
+            n = len(re.findall(r"^Solution (\d+):", prompt, flags=re.MULTILINE))
+            # exercise every branch of judge_choice: a label, the answer value, NONE, and an unusable tag
+            pick = rng.choice(["label", "label", "value", "none", "junk"])
+            if pick == "none":
+                return tags(reasoning="none of these hold up", selected_solution="NONE")
+            if pick == "junk":
+                return tags(reasoning="unsure", selected_solution="maybe the first one")
+            if pick == "value":
+                value = re.findall(r"<final_answer>(.*?)</final_answer>", prompt, flags=re.DOTALL)[-1].strip()
+                return tags(reasoning="...", selected_solution=value)
+            return tags(reasoning="...", selected_solution=str(rng.randint(1, n)))
         if "Give ONLY the final answer" in prompt:
             return tags(final_answer=random_answer(rng, fmt))
         if "Solve the following problem carefully" in prompt:  # CoT samples
@@ -287,6 +299,51 @@ def main() -> int:
           "the self-verify records are untouched by a verifier run")
     check(analyze_esv3.main(["--verifier-model", "openai/gpt-oss-120b"]) == 0,
           "analyze_esv3 reads the verifier records via --verifier-model")
+
+    # --- judge-select control: added to existing records without repeating the ESV verification call ---
+    vpath = folder / "esv3_records.gpt-oss-120b.json"
+    before = json.loads(vpath.read_text(encoding="utf-8"))["instances"]
+    esv_calls_before = {i: json.dumps(r["methods"]["esv3"]["call"]) for i, r in before.items()}
+    check(all("judge_select" not in r["methods"] for r in before.values()),
+          "judge-select is opt-in: absent unless --judge-select is passed")
+    check(analyze_esv3.main(["--verifier-model", "openai/gpt-oss-120b"]) == 0,
+          "analyze_esv3 tolerates records without the judge-select arm")
+    # Every pooled model needs verifier records for analyze_esv3 to report stages 2-3, so run the control across
+    # all of them: `model` is topped up in place, the others are created with the arm already in them.
+    run_esv3.main(["--workers", "2", "--models", *common.SOLVER_MODELS, "--limit-pairs", "2",
+                   "--verifier-model", "openai/gpt-oss-120b", "--judge-select"], client=FakeClient(seed=18))
+    after = json.loads(vpath.read_text(encoding="utf-8"))["instances"]
+    check(set(after) == set(before), "--judge-select tops up in place, adding no instances")
+    check(all("judge_select" in r["methods"] for r in after.values()), "every record gains the judge-select arm")
+    check(all(json.dumps(r["methods"]["esv3"]["call"]) == esv_calls_before[i] for i, r in after.items()),
+          "topping up reuses the stored ESV call instead of paying for it again")
+    jdis = [r for r in after.values() if len(r["candidates"]) >= 2]
+    check(all(r["methods"]["judge_select"]["call"] is None for r in after.values() if len(r["candidates"]) < 2),
+          "judge-select makes no call on unanimous instances")
+    check(jdis and all(r["methods"]["judge_select"]["call"] is not None for r in jdis),
+          "judge-select calls once per disagreeing instance")
+    check(all(r["methods"]["judge_select"]["call"]["model"] == "openai/gpt-oss-120b" for r in jdis),
+          "judge-select asks the same checker as ESV, not the solver")
+    seen = {r["methods"]["judge_select"]["selection"] for r in jdis}
+    check(seen <= {"label", "value", "none", "ambiguous", "unresolved"}, f"judge_choice returns known outcomes ({seen})")
+    for r in jdis:
+        j = r["methods"]["judge_select"]
+        if j["selection"] in (None, "none", "unresolved"):
+            check(j["final_normalized"] == r["initial"]["normalized"],
+                  "judge-select falls back to the initial answer when it selects nothing")
+        else:
+            check(j["final_answer"] == r["candidates"][j["chosen"]]["answer"],
+                  "judge-select's final answer is the candidate it named")
+    nsent = FakeClient(seed=19)
+    run_esv3.main(["--workers", "2", "--models", *common.SOLVER_MODELS, "--limit-pairs", "2",
+                   "--verifier-model", "openai/gpt-oss-120b", "--judge-select"], client=nsent)
+    check(nsent.completions.calls == 0, "a second --judge-select run makes no calls (resume)")
+    check(analyze_esv3.main(["--verifier-model", "openai/gpt-oss-120b"]) == 0,
+          "analyze_esv3 runs with the judge-select arm present")
+    jreport = (common.RESULTS_DIR / "analysis" / "esv3_report.gpt-oss-120b.md").read_text(encoding="utf-8")
+    for heading in ("The judge-select control", "Where the two differ", "What judge-select actually returned",
+                    "Judge-select (same checker, no ESV form)"):
+        check(heading in jreport, f"the report renders the judge-select section: {heading!r}")
     check(analyze_esv3.main([]) == 0 and "Go / no-go" in (common.RESULTS_DIR / "analysis" / "esv3_report.md").read_text(encoding="utf-8"),
           "analyze_esv3 ran (stages 1-3 and the go / no-go line)")
 

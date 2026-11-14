@@ -181,6 +181,51 @@ def build_v3_verify_prompt(instance: Dict[str, Any], solutions: List[Dict[str, s
     )
 
 
+# ---- Judge-select control (run_esv3.py --judge-select) ---------------------------------------------
+# Isolates ESV's STRUCTURE from the checker's raw capability. It is deliberately matched to
+# build_v3_verify_prompt on everything except the form: the same model, the same distinct candidates in the
+# same order, the same hidden vote counts, the same licence to reject every candidate, and the same freedom to
+# reason at length first. The only difference is that it is asked to think in its own words and pick, instead of
+# filling in bindings / conditions / divergence / verdict per candidate.
+#
+# Two choices here make the control HARDER for ESV to beat, which is the point of a control:
+#   * NONE is allowed, so judge-select keeps ESV's ability to decline (ESV's `none_sound` branch). Forcing a pick
+#     would hand ESV a free win on the instances where no candidate survives.
+#   * a free-form `reasoning` tag comes first, so the comparison is "ESV's structure vs unstructured reasoning",
+#     not "structured reasoning vs no thinking at all", which would be a strawman.
+
+JUDGE_TAG_RULES = """
+Format rules (strict):
+- Output ONLY the tags listed, in order, each with an opening and a closing tag. No JSON, no Markdown fences, no text outside the tags.
+- Write LaTeX normally with single backslashes; do not escape anything.
+- Be concise: about 150 words per solution in the reasoning tag, and never leave a tag unfinished."""
+
+
+def judge_select_fields(n: int) -> Dict[str, str]:
+    return {
+        "reasoning": "how you decided, in your own words",
+        "selected_solution": (f"ONE integer from 1 to {n}: the label of the solution you select, NOT its answer "
+                              f"value; or NONE if no solution is correct"),
+    }
+
+
+def build_judge_select_prompt(instance: Dict[str, Any], solutions: List[Dict[str, str]]) -> str:
+    """The judge-select control: the same candidates as ESV v3, judged without ESV's structured form."""
+    n = len(solutions)
+    shown = "\n\n".join(f"Solution {i}:\n<reasoning>{clipped(s['reasoning'])}</reasoning>\n<final_answer>{s['answer']}</final_answer>"
+                        for i, s in enumerate(solutions, start=1))
+    return (
+        "You are judging several solutions to the same problem.\n"
+        "The solutions reach DIFFERENT final answers, so at most one of them is correct, and all of them may be wrong. "
+        "They are listed in arbitrary order; how many attempts reached each answer is not shown and is not evidence.\n\n"
+        "Work out which solution, if any, is correct, and select it. If no solution is correct, select NONE.\n\n"
+        f"{problem_block(instance)}\n\n{shown}\n{JUDGE_TAG_RULES}\n"
+        f"- Identify your selection by its Solution LABEL, the integer 1-{n} printed above it, or the word NONE. "
+        f"Do not write the answer itself: `<selected_solution>2</selected_solution>` means Solution 2, not the answer 2.\n\n"
+        f"Output exactly these tags:\n{tag_block(judge_select_fields(n))}"
+    )
+
+
 def usc_fields(n: int = 4) -> Dict[str, str]:
     """"the number OF the most consistent response" was read as "the number THAT IS the most consistent response":
     solvers returned the answer value (35, 200, ...) instead of the response index, and usc_choice then had nothing
