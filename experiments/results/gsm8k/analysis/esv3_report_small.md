@@ -146,13 +146,72 @@ USC names its pick in one tag. Where that tag cannot be resolved to a response, 
 
 `none_sound` is where stage 4 would act; `a candidate is right` there is its ceiling.
 
-### By arm (pooled)
+### By arm
+
+Accuracy on the untouched originals, on strategy-preserving P' and on strategy-breaking P', per model and pooled. ESV's premise is that the breaking arm is where a selector has the most to recover, so the fixes / breaks column is read per arm.
+
+**qwen/qwen-2.5-7b-instruct**
+
+| arm | n | CoT maj@4 (initial) | Universal Self-Consistency | ESV v3 (stages 1-3) | ESV v3 fixes / breaks |
+|---|---|---|---|---|---|
+| original | 192 | 92.2% | 92.7% | 92.7% | 3 / 2 |
+| breaking | 99 | 83.8% | 82.8% | 75.8% | 1 / 9 |
+| preserving | 99 | 96.0% | 94.9% | 96.0% | 0 / 0 |
+
+**mistralai/mistral-nemo**
+
+| arm | n | CoT maj@4 (initial) | Universal Self-Consistency | ESV v3 (stages 1-3) | ESV v3 fixes / breaks |
+|---|---|---|---|---|---|
+| original | 192 | 88.0% | 88.5% | 83.9% | 3 / 11 |
+| breaking | 99 | 72.7% | 73.7% | 64.6% | 4 / 12 |
+| preserving | 99 | 88.9% | 92.9% | 81.8% | 3 / 10 |
+
+**google/gemma-3-4b-it**
+
+| arm | n | CoT maj@4 (initial) | Universal Self-Consistency | ESV v3 (stages 1-3) | ESV v3 fixes / breaks |
+|---|---|---|---|---|---|
+| original | 192 | 91.7% | 93.2% | 89.6% | 1 / 5 |
+| breaking | 99 | 80.8% | 82.8% | 77.8% | 3 / 6 |
+| preserving | 99 | 96.0% | 96.0% | 93.9% | 0 / 2 |
+
+**Pooled**
 
 | arm | n | CoT maj@4 (initial) | Universal Self-Consistency | ESV v3 (stages 1-3) | ESV v3 fixes / breaks |
 |---|---|---|---|---|---|
 | original | 576 | 90.6% | 91.5% | 88.7% | 7 / 18 |
 | breaking | 297 | 79.1% | 79.8% | 72.7% | 8 / 27 |
 | preserving | 297 | 93.6% | 94.6% | 90.6% | 3 / 12 |
+
+### Decisions, per model
+
+The same decision mix as above, split by model: a checker that almost never returns `one_sound` is abstaining, not selecting.
+
+**qwen/qwen-2.5-7b-instruct**
+
+| decision | n | CoT maj@4 | ESV v3 | fixes | breaks | a candidate is right |
+|---|---|---|---|---|---|---|
+| unanimous | 317 | 98.7% | 98.7% | 0 | 0 | 313 |
+| one_sound | 52 | 59.6% | 50.0% | 4 | 9 | 41 |
+| several_sound | 9 | 55.6% | 33.3% | 0 | 2 | 7 |
+| none_sound | 12 | 50.0% | 50.0% | 0 | 0 | 9 |
+
+**mistralai/mistral-nemo**
+
+| decision | n | CoT maj@4 | ESV v3 | fixes | breaks | a candidate is right |
+|---|---|---|---|---|---|---|
+| unanimous | 227 | 99.1% | 99.1% | 0 | 0 | 225 |
+| one_sound | 120 | 71.7% | 51.7% | 8 | 32 | 107 |
+| several_sound | 36 | 36.1% | 38.9% | 2 | 1 | 30 |
+| none_sound | 7 | 71.4% | 71.4% | 0 | 0 | 6 |
+
+**google/gemma-3-4b-it**
+
+| decision | n | CoT maj@4 | ESV v3 | fixes | breaks | a candidate is right |
+|---|---|---|---|---|---|---|
+| unanimous | 323 | 96.6% | 96.6% | 0 | 0 | 312 |
+| one_sound | 51 | 60.8% | 43.1% | 4 | 13 | 44 |
+| several_sound | 4 | 100.0% | 100.0% | 0 | 0 | 4 |
+| none_sound | 12 | 33.3% | 33.3% | 0 | 0 | 8 |
 
 ## Compute cost
 

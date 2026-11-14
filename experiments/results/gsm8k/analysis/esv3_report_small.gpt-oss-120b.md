@@ -151,13 +151,69 @@ USC names its pick in one tag. Where that tag cannot be resolved to a response, 
 
 `none_sound` is where stage 4 would act; `a candidate is right` there is its ceiling.
 
-### By arm (pooled)
+### By arm
+
+Accuracy on the untouched originals, on strategy-preserving P' and on strategy-breaking P', per model and pooled. ESV's premise is that the breaking arm is where a selector has the most to recover, so the fixes / breaks column is read per arm.
+
+**qwen/qwen-2.5-7b-instruct**
+
+| arm | n | CoT maj@4 (initial) | Universal Self-Consistency | ESV v3 (stages 1-3) | ESV v3 fixes / breaks |
+|---|---|---|---|---|---|
+| original | 192 | 92.2% | 92.7% | 95.3% | 6 / 0 |
+| breaking | 99 | 83.8% | 82.8% | 88.9% | 5 / 0 |
+| preserving | 99 | 96.0% | 94.9% | 99.0% | 3 / 0 |
+
+**mistralai/mistral-nemo**
+
+| arm | n | CoT maj@4 (initial) | Universal Self-Consistency | ESV v3 (stages 1-3) | ESV v3 fixes / breaks |
+|---|---|---|---|---|---|
+| original | 192 | 88.0% | 88.5% | 93.8% | 12 / 1 |
+| breaking | 99 | 72.7% | 73.7% | 85.9% | 13 / 0 |
+| preserving | 99 | 88.9% | 92.9% | 98.0% | 10 / 1 |
+
+**google/gemma-3-4b-it**
+
+| arm | n | CoT maj@4 (initial) | Universal Self-Consistency | ESV v3 (stages 1-3) | ESV v3 fixes / breaks |
+|---|---|---|---|---|---|
+| original | 192 | 91.7% | 93.2% | 94.3% | 5 / 0 |
+| breaking | 99 | 80.8% | 82.8% | 87.9% | 7 / 0 |
+| preserving | 99 | 96.0% | 96.0% | 96.0% | 0 / 0 |
+
+**Pooled**
 
 | arm | n | CoT maj@4 (initial) | Universal Self-Consistency | ESV v3 (stages 1-3) | ESV v3 fixes / breaks |
 |---|---|---|---|---|---|
 | original | 576 | 90.6% | 91.5% | 94.4% | 23 / 1 |
 | breaking | 297 | 79.1% | 79.8% | 87.5% | 25 / 0 |
 | preserving | 297 | 93.6% | 94.6% | 97.6% | 13 / 1 |
+
+### Decisions, per model
+
+The same decision mix as above, split by model: a checker that almost never returns `one_sound` is abstaining, not selecting.
+
+**qwen/qwen-2.5-7b-instruct**
+
+| decision | n | CoT maj@4 | ESV v3 | fixes | breaks | a candidate is right |
+|---|---|---|---|---|---|---|
+| unanimous | 317 | 98.7% | 98.7% | 0 | 0 | 313 |
+| one_sound | 54 | 68.5% | 94.4% | 14 | 0 | 52 |
+| none_sound | 19 | 26.3% | 26.3% | 0 | 0 | 5 |
+
+**mistralai/mistral-nemo**
+
+| decision | n | CoT maj@4 | ESV v3 | fixes | breaks | a candidate is right |
+|---|---|---|---|---|---|---|
+| unanimous | 227 | 99.1% | 99.1% | 0 | 0 | 225 |
+| one_sound | 130 | 72.3% | 97.7% | 35 | 2 | 130 |
+| none_sound | 33 | 30.3% | 30.3% | 0 | 0 | 13 |
+
+**google/gemma-3-4b-it**
+
+| decision | n | CoT maj@4 | ESV v3 | fixes | breaks | a candidate is right |
+|---|---|---|---|---|---|---|
+| unanimous | 323 | 96.6% | 96.6% | 0 | 0 | 312 |
+| one_sound | 47 | 68.1% | 93.6% | 12 | 0 | 44 |
+| none_sound | 20 | 35.0% | 35.0% | 0 | 0 | 12 |
 
 ## The judge-select control: is it the structure, or the checker?
 
