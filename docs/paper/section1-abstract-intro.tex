@@ -1,0 +1,76 @@
+%% ======================================================================
+%% ABSTRACT
+%% ======================================================================
+\begin{abstract}
+Self-consistency samples several chains of thought and returns the majority
+answer. This has been the traditional way to turn extra inference compute into accuracy on
+reasoning and logic benchmarks, but it selects by answer frequency alone and is therefore
+blind to whether the reasoning behind any candidate is valid. The accuracy declines sharply as the difficulty of the problems increases. For small open-weight models, the best answer that is already present among the four sampled chains of thought
+beats their majority vote by six points on GSM8K, twelve on MATH-500 and eighteen on
+JEEBench. Therefore, we introduce \textbf{\method{}}, \textbf{E}xplicit \textbf{S}trategy \textbf{V}erification, a gold-free procedure that never re-solves the problem: a zero-cost disagreement gate, one contrastive
+verification call requiring each candidate's strategy to be bound to quoted givens and its preconditions checked, and a deterministic rule accepting only
+candidates with no mismatched binding and no violated condition. Across 2,918 instances spanning GSM8K, MATH-500 and JEEBench, \method{} improves accuracy by 5.0, 5.9 and 3.5 points over CoT maj@4 (148 repairs against 4 regressions; $p \le 10^{-7}$ on all three), while Universal Self-Consistency reaches significance
+on none. Substituting the solver for the stronger checker reverses the
+effect on all three benchmarks, locating the method's requirement precisely: gold-free
+verification needs a verifier stronger than the model under test. Every problem is paired with a
+structural perturbation that either breaks the strategy the original invites or
+preserves it, a design that manufactures selection errors of known cause and
+separates strategy misfit from mere novelty---the error class frequency-based
+selection cannot see.
+\end{abstract}
+
+%% ================================================
+\section{Introduction}
+
+Large language models solve multi-step reasoning problems by generating an
+explicit chain of thought before committing to an answer~\cite{wei2022chain}. Because any single chain can go wrong, the standard
+way to spend additional inference compute is to sample several of them and return their majority answer, a procedure known as self-consistency~\cite{wang2022self}. Yet majority voting selects among candidates by answer frequency alone, and is therefore blind to whether the reasoning that produced any of them is valid. The accuracy this forfeits is
+substantial: for small open-weight models, the best answer already present among four sampled chains of thought exceeds their majority vote by six points on GSM8K, twelve points on MATH-500 and eighteen points on JEEBench. Existing gold-free remedies attack this gap in one of two ways, either re-solving the problem from a critique of the first attempt~\cite{madaan2023self,shinn2023reflexion}, or asking the model to nominate the most consistent of its own samples~\cite{chen2023universal}. The first pays full inference cost a second
+time, and the second inherits the very biases that produced the error.
+
+We argue that a practical gold-free selection method must satisfy three
+requirements simultaneously: (1) it must never consult a reference answer, so
+that it is deployable at inference time; (2) it must not re-solve the problem,
+so that its cost is a fraction of the sampling budget it augments rather than a
+multiple of it; and (3) it must not damage answers that were already correct,
+since a method that fires on uncertainty can break a correct majority as easily
+as repair a wrong one (Section~\ref{sec:requirements}). Existing methods satisfy
+at most two. Re-solving approaches violate (2) by construction, and when the
+model critiques its own work they violate (3) as well, because the blind spot
+that produced the error also confirms it~\cite{huang2024large}. Selection
+methods such as Universal Self-Consistency respect (1) and (2), but ask the
+solver to adjudicate its own samples and so gain little over the majority vote
+they replace. Satisfying all three at once is not a trivial issue.
+
+To bridge this research gap, we propose \textbf{\method{}} (\textbf{Explicit Strategy
+Verification}), a multi-stage gold-free pipeline that selects among answers the
+solver has already produced and never re-solves the problem. A disagreement
+gate first groups the samples into distinct candidates and halts immediately
+when they agree, which costs no model calls and concentrates all verification
+spend on the instances that can actually change
+(Section~\ref{sec:gate}). Where they disagree, a single call presents the
+distinct candidates---deduplicated, with vote counts hidden---to a checker
+stronger than the solver, and a decision rule commits to one candidate or
+abstains and keeps the majority answer (Sections~\ref{sec:verify}--\ref{sec:decide}). On
+GSM8K, MATH-500 and JEEBench, across three open-weight solvers on the first and
+two on the others, \method{} improves accuracy over majority voting by 5.0, 5.9
+and 3.5 points respectively, against 0.9, 0.4 and $-1.9$ points for Universal
+Self-Consistency, at 44\%, 83\% and 100\% of the sampling budget in additional
+compute. To attribute the gain, we evaluate each stage in isolation on a
+benchmark of structural perturbations built for the purpose.
+
+To summarize, our contributions are:
+\begin{itemize}
+  \item We identify three requirements that a gold-free selection method must
+        meet jointly, and show that no existing method meets all three.
+  \item We propose \method{}, a gated verification pipeline that improves on
+        majority voting and Universal Self-Consistency on every benchmark and
+        solver we evaluate, without re-solving any problem.
+  \item We construct a perturbation benchmark of matched problem pairs in which
+        one variant breaks the strategy the original invites and the other
+        preserves it, with an independently verified trap answer that makes the
+        cause of each failure known.
+  \item Component-wise experiments locate the gain in the checker's strength
+        rather than in the verification format, and show that substituting the
+        solver for the checker reverses the method's effect entirely.
+\end{itemize}

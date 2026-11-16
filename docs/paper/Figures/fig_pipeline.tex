@@ -1,0 +1,60 @@
+% ======================================================================
+% fig_pipeline -- standalone build of a figure that main.tex also draws inline.
+% ----------------------------------------------------------------------
+% The tikzpicture below is copied VERBATIM from main.tex, so this file and
+% the inline version render identically. Build with:
+%     pdflatex fig_pipeline.tex
+% The standalone class crops the PDF to the picture's bounding box, so no
+% trim/clip is ever needed in the paper.
+%
+% Fonts: the picture inherits times/helvet, so every glyph is Type 1 and
+% embedded by pdflatex. Nothing is rasterised, so DPI does not apply.
+% ======================================================================
+\documentclass[border=2pt]{standalone}
+
+\usepackage{times}
+\usepackage{helvet}
+\usepackage{courier}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{xcolor}
+\usepackage{pifont}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+
+\input{preamble-figures}
+
+\begin{document}
+\begin{tikzpicture}[
+  font=\small,
+  base/.style={draw, rounded corners=2.5pt, align=center, inner sep=4pt,
+               text width=44mm, minimum height=8mm},
+  shared/.style={base, fill=cshared},
+  code/.style={base, fill=ccode},
+  call/.style={base, fill=ccall, draw=ccallb, line width=1pt},
+  outbox/.style={base, fill=cout},
+  fields/.style={base, fill=white, font=\scriptsize},
+  ar/.style={-{Latex[length=2.2mm]}, semithick},
+  cost/.style={font=\scriptsize},
+  side/.style={font=\scriptsize, align=center, text width=15mm},
+]
+\node[shared] (cands) at (0,0)     {$K$ candidates, one representative solution each};
+\node[code]   (gate)  at (0,-1.55) {\textbf{1.} disagreement gate\\[-1pt]{\cost free (code)}};
+\node[call]   (ver)   at (0,-3.10) {\textbf{2.} contrastive verification\\[-1pt]{\cost $1$ checker call}};
+\node[fields] (flds)  at (0,-4.65) {per candidate: strategy, bindings, conditions, verdict};
+\node[code]   (rule)  at (0,-6.20) {\textbf{3.} strict decision rule\\[-1pt]{\cost free (code)}};
+\node[outbox] (ans)   at (0,-7.75) {committed answer};
+
+\draw[ar] (cands) -- (gate);
+\draw[ar] (gate)  -- node[right, cost] {$K \ge 2$} (ver);
+\draw[ar] (ver)   -- (flds);
+\draw[ar] (flds)  -- (rule);
+\draw[ar] (rule)  -- (ans);
+
+%% unanimous bypass, routed down the right-hand margin
+\coordinate (b1) at (3.4,-1.55);
+\coordinate (b2) at (3.4,-7.75);
+\draw[ar, densely dashed] (gate.east) -- (b1) -- (b2) -- (ans.east);
+\node[side] at (4.25,-4.65) {$K = 1$:\\keep $m(x)$,\\no call};
+\end{tikzpicture}
+\end{document}
