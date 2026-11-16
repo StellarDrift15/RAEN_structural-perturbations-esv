@@ -4,8 +4,6 @@
 
 ### Recognizing and Repairing Invalid Reasoning Strategies under Structural Perturbations: A Gold-Free Verification Method that beats Majority Voting & Universal Self-Consistency (USC)
 
-*(RAEN — `RAEN_structural-perturbations-esv`)*
-
 ![status](https://img.shields.io/badge/status-research%20in%20progress-blue)
 ![python](https://img.shields.io/badge/python-3.12-3776AB)
 ![license](https://img.shields.io/badge/license-Apache--2.0-green)
