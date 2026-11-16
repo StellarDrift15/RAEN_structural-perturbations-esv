@@ -2,7 +2,7 @@
 
 # Explicit Strategy Verification (ESV)
 
-### Recognizing and Repairing Invalid Reasoning Strategies under Structural Perturbations: A Gold-Free Verification Method that beats Majority Voting & Universal Self-Consistency (USC)
+### Explicit Strategy Verification: Gold-Free Answer Selection Without Re-Solving
 
 ![status](https://img.shields.io/badge/status-research%20in%20progress-blue)
 ![python](https://img.shields.io/badge/python-3.12-3776AB)
