@@ -1,0 +1,100 @@
+%% ======================================================================
+\section{Preliminaries and Problem Formulation}
+\label{sec:prelim}
+%% ======================================================================
+
+\paragraph{Sampling and candidates.}
+Given a problem $x$ with reference answer $y$, a solver produces $n = 4$ chains
+of thought and the answer each one reaches. Grouping answers that agree under a
+type-aware normalisation yields $K \le n$ distinct \emph{candidates}
+$c_1, \dots, c_K$ with vote counts $v_1, \dots, v_K$ summing to $n$, each
+carrying one representative solution. Self-consistency \cite{wang2022self}
+returns the candidate with the most votes, which we write $m(x)$ and refer to
+throughout as CoT maj@4, our baseline. We write CoT pass@4 for the oracle that
+is correct whenever $y$ appears among the candidates.
+
+\paragraph{The selection task.}
+We study \emph{answer selection}: given the problem and the candidates the
+solver has already produced, commit to one of them. Every method we compare
+consumes the same four samples, drawn once per instance and reused unchanged,
+and differs only in the evidence it reads off them. CoT maj@4 uses the vote
+counts; Universal Self-Consistency \cite{chen2023universal} sees the samples
+with duplicates shown, so multiplicity remains visible; the verification
+methods we study see the problem text and the representative solutions with
+vote counts withheld. Holding the input fixed in this way makes the comparison
+one about selection evidence rather than about sampling luck.
+
+\subsection{Requirements on a gold-free selector}
+\label{sec:requirements}
+
+Three constraints separate a selector deployable at inference time from one
+that merely explains a benchmark after the fact.
+
+\begin{description}
+\item[\textnormal{(R1) \emph{Gold-free.}}] The selector reads only the problem
+  and the samples. The reference answer enters at scoring and nowhere else.
+\item[\textnormal{(R2) \emph{No re-solving.}}] The selector issues no further
+  call to the solver, so its cost is a fraction of the sampling budget it
+  augments rather than a multiple of it.
+\item[\textnormal{(R3) \emph{Non-destructive.}}] Because the selector may
+  overturn $m(x)$, it must be judged by what it repairs \emph{and} what it
+  damages, not by accuracy alone.
+\end{description}
+
+R3 fixes our unit of measurement. Against the maj@4 baseline, a \emph{fix} is
+an instance the majority got wrong and the selector gets right, a \emph{break}
+the reverse, and we report the two together with an exact McNemar test rather
+than an accuracy delta on its own.
+
+\paragraph{Selection is a two-sided bet.}
+A selector constrained to the candidates cannot invent an answer the solver
+never produced, which bounds both of its tails. Let $\mathcal{F}$ be the
+instances where the majority is wrong but some candidate is right, and
+$\mathcal{B}$ those where the majority is already right and the candidates
+disagree. Over $N$ instances,
+\begin{equation}
+  -\frac{|\mathcal{B}|}{N}
+  \;\le\; \Delta\mathrm{acc}
+  \;\le\; \frac{|\mathcal{F}|}{N}
+  \;=\; \mathrm{pass@}4 - \mathrm{maj@}4 ,
+  \label{eq:bounds}
+\end{equation}
+since a unanimous-but-wrong instance contains no correct candidate and so
+raises neither bound. The upper bound is the \emph{headroom} a selector
+competes for. The two sets are not the same size, and we report both in
+Section~\ref{sec:results}; the relevant point here is that R3 is forced by
+Eq.~\eqref{eq:bounds} rather than adopted out of caution.
+
+\paragraph{When a verdict is worth acting on.}
+The vote is itself an informative signal, so a selector that overturns it needs
+evidence strong enough to overcome that prior. Let $p(v)$ be the probability
+that a candidate with $v$ votes is correct and
+$\rho(v) = p(v)/(1 - p(v))$ the corresponding odds. A verifier returning
+evidence $E$ about a candidate carries the likelihood ratio
+$\Lambda = \Pr(E \mid \text{correct}) / \Pr(E \mid \text{wrong})$, and
+preferring a $v_c$-vote candidate over a $v_m$-vote majority requires
+\begin{equation}
+  \Lambda \;>\; \rho(v_m) \,/\, \rho(v_c) .
+  \label{eq:threshold}
+\end{equation}
+We estimate $p(v)$ on a development split, so Eq.~\eqref{eq:threshold} states
+in advance how strong a checker must be before a verification call can pay for
+itself. It is a specification fixed before any verifier is measured, not a
+post-hoc account of one, and Section~\ref{sec:results} compares measured
+likelihood ratios against it.
+
+\paragraph{Perturbation pairs.}
+Rather than evaluate on problems whose failure modes are unknown, we evaluate
+on matched pairs. Each item is a frozen pair $(P, P')$ together with the
+solution strategy $S$ that the original invites, where $P'$ alters one
+structure, relationship or constraint of $P$ while remaining well posed and
+keeping the original answer format. In a \emph{strategy-breaking} pair,
+applying $S$ unchanged to $P'$ gives a wrong answer, which we record as the
+\emph{trap}; in a \emph{strategy-preserving} pair, $S$ still works but the
+answer changes and must be recomputed. The preserving mode is the control for
+mere novelty, separating a method that degrades on any altered problem from one
+that detects strategy misfit. The trap is what makes a pair informative: a
+candidate equal to the trap is wrong for a known reason, which supplies
+per-instance ground truth for the error class that frequency-based selection
+cannot see. Section~\ref{sec:setup} gives the generation and verification
+protocol and the resulting dataset statistics.

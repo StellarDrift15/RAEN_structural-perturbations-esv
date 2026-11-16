@@ -1,0 +1,43 @@
+%% ======================================================================
+%% preamble-figures.tex
+%% ----------------------------------------------------------------------
+%% Every definition the figures need, kept identical to main.tex's preamble.
+%% Shared by the standalone builds in this folder; main.tex carries its own
+%% copy so that the submitted source stays a single .tex file.
+%% ======================================================================
+
+\providecommand{\method}{\textsc{ESV}}
+
+%% --- comparison-table glyphs (fig_trap uses \yes / \no) ---------------
+\definecolor{okgreen}{RGB}{0,122,87}
+\definecolor{okred}{RGB}{176,42,32}
+\providecommand{\yes}{\textcolor{okgreen}{\ding{51}}}
+\providecommand{\no}{\textcolor{okred}{\ding{55}}}
+\providecommand{\na}{\textcolor{black!45}{--}}
+
+%% --- figure fills, shaded by what each step costs ---------------------
+\definecolor{cshared}{RGB}{226,226,226}
+\definecolor{ccode}{RGB}{205,228,243}
+\definecolor{ccall}{RGB}{252,230,192}
+\definecolor{ccallb}{RGB}{191,118,0}
+\definecolor{cout}{RGB}{206,238,227}
+\definecolor{ctrap}{RGB}{250,222,218}
+
+%% --- plot colours and markers -----------------------------------------
+%% Marker shapes are core TikZ nodes, so every glyph is vector and uses the
+%% document's Type 1 text fonts: no Type 3 subsets, no raster, nothing to crop.
+\definecolor{pblue}{RGB}{31,97,160}
+\definecolor{pgreen}{RGB}{0,122,87}
+\definecolor{pgrey}{RGB}{95,95,95}
+\providecommand{\mkopensq}[2]{\node[draw=#2,fill=white,line width=.6pt,rectangle,inner sep=1.5pt] at #1 {};}
+\providecommand{\mkfillsq}[2]{\node[draw=#2,fill=#2,rectangle,inner sep=1.5pt] at #1 {};}
+\providecommand{\mkopenci}[2]{\node[draw=#2,fill=white,line width=.6pt,circle,inner sep=1.5pt] at #1 {};}
+\providecommand{\mkfillci}[2]{\node[draw=#2,fill=#2,circle,inner sep=1.5pt] at #1 {};}
+%% #1 x, #2 centre, #3 half-width of the interval, #4 colour (needs x=1cm)
+\providecommand{\ebar}[4]{%
+  \draw[#4,line width=.5pt] (#1,{#2-#3}) -- (#1,{#2+#3});
+  \draw[#4,line width=.5pt] ({#1-0.055},{#2-#3}) -- ({#1+0.055},{#2-#3});
+  \draw[#4,line width=.5pt] ({#1-0.055},{#2+#3}) -- ({#1+0.055},{#2+#3});}
+
+%% --- \cost is used inside the three schematic figures -----------------
+\providecommand{\cost}{\scriptsize}
