@@ -14,18 +14,6 @@
 
 </div>
 
----
-
-## Target venues
-
-| Venue | Track | Intended contribution | Status |
-|---|---|---|---|
-| **ICML 2027** | Main conference | Full paper: ESV protocol, the verifier-independence finding, and the quantitative likelihood-ratio criterion for when verification can beat majority voting | Planned. Two controls still pending (see [Open work](#open-work)) |
-| **AAAI workshops** | Reasoning / LLM-reliability style workshops | Analysis-paper fallback: the negative self-verification result across two benchmarks, plus the independent-verifier result | Planned |
-
-> **Note for reviewers.** Nothing here has been submitted yet. Venue names are the authors' *targets*, not acceptances. Deadlines, page limits and anonymity rules must be taken from each venue's official call for papers; they are deliberately not restated here. The go / no-go rule that decides between the two framings was fixed **before** the held-out run (see [Pre-registration](#pre-registration-and-split-discipline)).
-
----
 
 ## Contents
 
