@@ -412,14 +412,6 @@ Retired runners (ESV v2 / v4, the retry controls, `analyze.py`) were removed fro
 **Citation.** A paper is in preparation. Until a preprint is available, please cite the repository:
 
 ```bibtex
-@misc{raen_esv_2026,
-  title        = {Explicit Strategy Verification: Recognizing and Repairing Invalid Reasoning
-                  Strategies under Structural Perturbations},
-  author       = {{Ekansh Agrawal, Ritvij Sharma, Anand Ramaswamy Jayshree}},
-  year         = {2026},
-  howpublished = {\url{https://github.com/StellarDrift15/RAEN_structural-perturbations-esv}},
-  note         = {Research code and data; manuscript in preparation}
-}
 ```
 
 **Key references.** JEEBench (Arora et al., 2023, [arXiv:2305.15074](https://arxiv.org/abs/2305.15074)); *Large Language Models Cannot Self-Correct Reasoning Yet* (Huang et al., 2024, [arXiv:2310.01798](https://arxiv.org/abs/2310.01798)); Universal Self-Consistency (Chen et al., 2023); GSM8K (Cobbe et al., 2021); MATH (Hendrycks et al., 2021, [arXiv:2103.03874](https://arxiv.org/abs/2103.03874)) and the MATH-500 subset of *Let's Verify Step by Step* (Lightman et al., 2023, [arXiv:2305.20050](https://arxiv.org/abs/2305.20050)).
