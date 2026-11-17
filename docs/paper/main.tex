@@ -152,19 +152,21 @@
 %% ======================================================================
 \begin{abstract}
 Self-consistency samples several chains of thought and returns the majority
-answer. This has been the traditional way to turn extra inference compute into accuracy on
-reasoning and logic benchmarks, but it selects by answer frequency alone and is therefore
-blind to whether the reasoning behind any candidate is valid. The accuracy declines sharply as the difficulty of the problems increases. For small open-weight models, the best answer that is already present among the four sampled chains of thought
+answer. It is the standard way to turn extra inference compute into accuracy on
+reasoning and logic benchmarks, but it selects by answer frequency alone, so it
+cannot see whether the reasoning behind any candidate is valid, and its accuracy
+falls sharply as the problems get harder. For small open-weight models, the best
+answer already present among the four sampled chains of thought
 beats their majority vote by 6 points on GSM8K, 12 on MATH-500 and 18 on
-JEEBench. Therefore, we introduce \textbf{\method{}}, \textbf{E}xplicit \textbf{S}trategy \textbf{V}erification, a gold-free procedure that never re-solves the problem: a zero-cost disagreement gate, one contrastive
-verification call requiring each candidate's strategy to be bound to quoted givens and its preconditions checked, and a deterministic rule accepting only
+JEEBench. We introduce \textbf{\method{}}, \textbf{E}xplicit \textbf{S}trategy \textbf{V}erification, a gold-free procedure that never re-solves the problem: a zero-cost disagreement gate, one contrastive
+verification call that requires each candidate's strategy to be bound to quoted givens and its preconditions checked, and a deterministic rule that accepts only
 candidates with no mismatched binding and no violated condition. Across 2,918 instances spanning GSM8K, MATH-500 and JEEBench, \method{} improves accuracy by 5.0, 5.9 and 3.5 points over CoT maj@4 (148 repairs against 4 regressions; $p \le 10^{-7}$ on all three), while Universal Self-Consistency reaches significance
 on none. Substituting the solver for the stronger checker reverses the
-effect on all three benchmarks, locating the method's requirement precisely: gold-free
-verification needs a verifier stronger than the model under test. Every problem is paired with a
+effect on all three benchmarks, which pins down what the method needs: gold-free
+verification requires a verifier stronger than the model under test. Every problem is paired with a
 structural perturbation that either breaks the strategy the original invites or
-preserves it, a design that manufactures selection errors of known cause and
-separates strategy misfit from mere novelty---the error class frequency-based
+preserves it. This design manufactures selection errors of known cause and
+separates strategy misfit from mere novelty, the error class frequency-based
 selection cannot see.
 \end{abstract}
 
@@ -173,12 +175,12 @@ selection cannot see.
 
 Large language models solve multi-step reasoning problems by generating an
 explicit chain of thought before committing to an answer~\cite{wei2022chain}. Because any single chain can go wrong, the standard
-way to spend additional inference compute is to sample several of them and return their majority answer, a procedure known as self-consistency~\cite{wang2022self}. Yet majority voting selects among candidates by answer frequency alone, and is therefore blind to whether the reasoning that produced any of them is valid. The accuracy this forfeits is
-substantial: for small open-weight models, the best answer already present among four sampled chains of thought exceeds their majority vote by six points on GSM8K, twelve points on MATH-500 and eighteen points on JEEBench. Existing gold-free remedies attack this gap in one of two ways, either re-solving the problem from a critique of the first attempt~\cite{madaan2023self,shinn2023reflexion}, or asking the model to nominate the most consistent of its own samples~\cite{chen2023universal}. The first pays full inference cost a second
-time, and the second inherits the very biases that produced the error.
+way to spend additional inference compute is to sample several of them and return their majority answer, a procedure known as self-consistency~\cite{wang2022self}. But majority voting selects among candidates by answer frequency alone, so it cannot see whether the reasoning that produced any of them is valid. What that forfeits is
+substantial: for small open-weight models, the best answer already present among four sampled chains of thought exceeds their majority vote by six points on GSM8K, twelve points on MATH-500 and eighteen points on JEEBench. Existing gold-free remedies take one of two routes. One re-solves the problem from a critique of the first attempt~\cite{madaan2023self,shinn2023reflexion}; the other asks the model to nominate the most consistent of its own samples~\cite{chen2023universal}. The first pays full inference cost a second
+time, and the second inherits the biases that produced the error.
 
-We argue that a practical gold-free selection method must satisfy three
-requirements simultaneously: (1) it must never consult a reference answer, so
+A practical gold-free selection method has to satisfy three
+requirements at once: (1) it must never consult a reference answer, so
 that it is deployable at inference time; (2) it must not re-solve the problem,
 so that its cost is a fraction of the sampling budget it augments rather than a
 multiple of it; and (3) it must not damage answers that were already correct,
@@ -187,30 +189,30 @@ as repair a wrong one (Section~\ref{sec:requirements}). Existing methods satisfy
 at most two. Re-solving approaches violate (2) by construction, and when the
 model critiques its own work they violate (3) as well, because the blind spot
 that produced the error also confirms it~\cite{huang2024large}. Selection
-methods such as Universal Self-Consistency respect (1) and (2), but ask the
-solver to adjudicate its own samples and so gain little over the majority vote
-they replace. Satisfying all three at once is not a trivial issue.
+methods such as Universal Self-Consistency respect (1) and (2), but they ask the
+solver to adjudicate its own samples, and so gain little over the majority vote
+they replace.
 
-To bridge this research gap, we propose \textbf{\method{}} (\textbf{Explicit Strategy
+We propose \textbf{\method{}} (\textbf{Explicit Strategy
 Verification}), a multi-stage gold-free pipeline that selects among answers the
 solver has already produced and never re-solves the problem
 (Section~\ref{sec:method}). A disagreement
-gate first groups the samples into distinct candidates and halts immediately
-when they agree, which costs no model calls and concentrates all verification
-spend on the instances that can actually change. Where they disagree, a single call presents the
-distinct candidates---deduplicated, with vote counts hidden---to a checker
-stronger than the solver, and a decision rule commits to one candidate or
+gate first groups the samples into distinct candidates and halts as soon as
+they agree, which costs no model calls and puts all verification
+spend on the instances that can actually change. Where they disagree, a single call hands the
+distinct candidates, deduplicated and with their vote counts hidden, to a checker
+stronger than the solver, and a decision rule either commits to one candidate or
 abstains and keeps the majority answer. On
 GSM8K, MATH-500 and JEEBench, across three open-weight solvers on the first and
 two on the others, \method{} improves accuracy over majority voting by 5.0, 5.9
 and 3.5 points respectively, against 0.9, 0.4 and $-1.9$ points for Universal
 Self-Consistency, at 44\%, 83\% and 100\% of the sampling budget in additional
 compute. To attribute the gain, we evaluate each stage in isolation on a
-benchmark of structural perturbations built for the purpose.
+benchmark of structural perturbations we built for the purpose.
 
-To summarize, our contributions are:
+Our contributions are:
 \begin{itemize}
-  \item We identify three requirements that a gold-free selection method must
+  \item We set out three requirements that a gold-free selection method must
         meet jointly, and show that no existing method meets all three.
   \item We propose \method{}, a gated verification pipeline that improves on
         majority voting and Universal Self-Consistency on every benchmark and
@@ -219,8 +221,8 @@ To summarize, our contributions are:
         one variant breaks the strategy the original invites and the other
         preserves it, with an independently verified trap answer that makes the
         cause of each failure known.
-  \item Component-wise experiments locate the gain in the checker's strength
-        rather than in the verification format, and show that substituting the
+  \item Component-wise experiments trace the gain to the checker's strength
+        rather than to the verification format, and show that substituting the
         solver for the checker reverses the method's effect entirely.
 \end{itemize}
 
@@ -228,7 +230,7 @@ To summarize, our contributions are:
 \section{Related Works}
 %% ======================================================================
 % Group by theme, not paper-by-paper. End each group with how you differ.
-We present related work through five critical themes: sampling and answer
+We group related work under five themes: sampling and answer
 aggregation, self-correction, external verification and LLM judges,
 perturbation robustness, and test-time compute allocation.
 
@@ -236,59 +238,59 @@ perturbation robustness, and test-time compute allocation.
 Self-consistency samples several chains of thought and returns the modal answer
 \cite{wang2022self}, and later work generalises the vote to free-form
 outputs by asking the model itself to select the most consistent response
-\cite{chen2023universal}. Aggregation of this kind is governed entirely by
-agreement: the answer a plurality of samples reach is returned regardless of
-whether its derivation is sound, so errors shared across samples are
-unrecoverable and a correct answer appearing only once can never win. Unlike
-these approaches, we leave the sample budget untouched and replace the frequency
+\cite{chen2023universal}. Agreement governs aggregation of this kind
+completely: the answer a plurality of samples reach is returned whether or not
+its derivation is sound, so errors shared across samples are
+unrecoverable and a correct answer appearing only once can never win. We instead
+leave the sample budget untouched and replace the frequency
 statistic with an explicit soundness check over the distinct candidates, which
-allows a minority answer to be selected when the majority's reasoning does not
+lets a minority answer win when the majority's reasoning does not
 survive verification.
 
 \paragraph{Self-correction and its limits.}
 Prior work on iterative refinement has models critique and revise their own
 outputs \cite{madaan2023self, shinn2023reflexion}, while a growing body of
-negative results finds that, absent an external signal, language models fail to
+negative results finds that, with no external signal, language models cannot
 reliably identify errors in their own reasoning \cite{huang2024large}. These
 studies establish \emph{that} self-correction fails; they do not isolate the
-quantity responsible. We measure it directly: holding the candidate set, the
+quantity responsible. We measure it directly. Holding the candidate set, the
 prompt and the decision rule fixed and varying only the identity of the checker,
 we find that a solver judges its own derivations sound an order of magnitude
-more often than an independent checker does, and that this miscalibration---not
-the verification format---is what turns self-checking into a net loss.
+more often than an independent checker does, and that this miscalibration, rather
+than the verification format, is what turns self-checking into a net loss.
 
 \paragraph{Learned verifiers and LLM judges.}
 A complementary line trains or prompts a separate model to assess candidate
 solutions, as an outcome verifier \cite{cobbe2021training}, a step-level process
 reward model \cite{lightman2024let}, or a general-purpose judge
 \cite{zheng2023judging}. This work establishes that external scoring helps, but
-it conflates two factors: the capability of the checker and the form in which it
+it conflates two factors: how capable the checker is, and the form in which it
 is asked to deliberate. We separate them with a control that holds the checker,
 its candidates and its budget fixed while replacing structured verification with
 free-form adjudication, and we report that comparison in both directions,
-including the regimes in which the structured form is the weaker of the two.
+including the regimes where the structured form is the weaker of the two.
 
 \paragraph{Perturbation and the memorization question.}
 Robustness studies perturb benchmark problems to test whether apparent reasoning
 survives distribution shift, by resampling symbolic templates, altering numeric
 values, or inserting insignificant clauses \cite{mirzadeh2025gsm}. Such
-perturbations are largely surface-level and carry no annotation with respect to
-the solution procedure, so a drop in accuracy cannot be attributed to any
+perturbations stay largely at the surface and carry no annotation with respect to
+the solution procedure, so a drop in accuracy cannot be traced to any
 specific failure of transfer. We define perturbations relative to an explicit
 solution strategy extracted from the original problem, and label each pair
 strategy-breaking or strategy-preserving only after two independent verifiers
-agree on the perturbed answer and confirm the intended result of that particular strategy.
-For breaking pairs, we additionally record the trap answer the original strategy
-yields, giving \textbf{per-instance ground truth} for the error mode a selector must
+agree on the perturbed answer and confirm what that particular strategy does to it.
+For breaking pairs we also record the trap answer the original strategy
+yields, which gives per-instance ground truth for the error mode a selector has to
 detect.
 
 \paragraph{Allocating test-time compute.}
 Recent work treats inference-time computation as a resource to be scheduled,
-trading additional samples, search, or verifier calls against accuracy \cite{snell2024scaling}. Our method is deliberately parsimonious within this framing: verification is gated on disagreement among the existing samples, so no
+trading additional samples, search, or verifier calls against accuracy \cite{snell2024scaling}. Our method is deliberately frugal within this framing: verification is gated on disagreement among the existing samples, so no
 additional call is issued where the solver is already unanimous, and the checker
-is invoked at most once per instance. We report the resulting cost in full---
-billed and critical-path latency, solver and verifier tokens separately, and
-tokens per net correction---so that the accuracy gained can be weighed against
+is invoked at most once per instance. We report the resulting cost in full,
+giving billed and critical-path latency, solver and verifier tokens separately, and
+tokens per net correction, so that the accuracy gained can be weighed against
 simply drawing more samples.
 
 %% ======================================================================
@@ -461,13 +463,13 @@ produced, so CoT pass@4 is a hard ceiling throughout.}
 \subsection{Constructing the perturbation pairs}
 \label{sec:construction}
 
-Each pair is produced by one generator model and accepted only on the
-agreement of two verifier models, independent of the generator and of each
-other. None of the three is a solver in any later experiment. One of the two
-verifiers is, however, the same model we later use as the independent checker,
-so every perturbed problem in the dataset is one that checker answered
-correctly during construction. We report the originals separately for this
-reason: they carry no such acceptance filter, and the checker's gain over the
+One generator model produces each pair, and two verifier models have to agree
+before it is accepted. The verifiers are independent of the generator and of
+each other, and none of the three is a solver in any later experiment. One of
+the two verifiers is, however, the same model we later use as the independent
+checker, so every perturbed problem in the dataset is one that checker answered
+correctly during construction. That is why we report the originals separately:
+they carry no such acceptance filter, and the checker's gain over the
 vote has to survive on them as well (Section~\ref{sec:results}).
 
 \paragraph{Generation.}
@@ -476,9 +478,9 @@ solution strategy $S$ that $P$ invites, alters exactly one condition, and
 returns the perturbed problem $P'$ together with its new answer, the condition
 it changed, the reason the change matters, an alternative strategy, the answer
 $S$ would produce if applied unchanged, and a confidence level. A balancer
-assigns each problem one mode --- strategy-breaking or strategy-preserving ---
-before the first attempt and holds it across retries, which keeps the two modes
-near parity rather than letting the generator drift toward whichever is easier
+assigns each problem one mode, strategy-breaking or strategy-preserving,
+before the first attempt and holds it across retries. This keeps the two modes
+near parity instead of letting the generator drift toward whichever is easier
 to produce.
 
 \paragraph{Verification.}
@@ -486,8 +488,8 @@ Acceptance turns on two calls to each verifier, in an order chosen so that
 anchoring is impossible.
 
 \begin{description}
-\item[\textnormal{\emph{Blind solve.}}] The verifier sees $P'$ alone --- not
-  $P$, not $S$, and not the generator's answer --- and solves it. The pair is
+\item[\textnormal{\emph{Blind solve.}}] The verifier sees $P'$ alone, without
+  $P$, without $S$ and without the generator's answer, and solves it. The pair is
   rejected if the verifier declares $P'$ ill-posed, if its answer disagrees
   with the generator's, or if its confidence falls below $0.6$. Withholding $P$
   is what makes the resulting answer an independent check rather than a
@@ -542,8 +544,8 @@ from the log.
    but here $35$ is Brian's \emph{daily} distance~\no};
 
 \node[note] (cc) at (0,-5.45)
-  {$S$ omits the final $\times 7$. The trap is $\mathbf{35}$ --- the original's
-   own answer --- while $P'$ requires $35 \times 7 = 245$.};
+  {$S$ omits the final $\times 7$. The trap is $\mathbf{35}$, the original's
+   own answer, while $P'$ requires $35 \times 7 = 245$.};
 
 \draw[ar] (pl) -- (s);
 \draw[ar] (pr) -- (s);
@@ -640,15 +642,15 @@ of its solutions. The prompt states that the solutions reach different answers,
 so at most one can be correct and all may be wrong; it presents them in
 arbitrary order; and it withholds the vote counts while saying explicitly that
 multiplicity is not evidence. For each candidate the checker returns the
-strategy in one sentence, then one line per given the strategy depends on ---
+strategy in one sentence, then one line per given the strategy depends on,
 quoted word for word from the problem statement rather than from the solution's
-restatement of it --- marked \textsc{matches} or \textsc{mismatch}, then one
+restatement of it, marked \textsc{matches} or \textsc{mismatch}, then one
 line per condition the strategy requires, marked \textsc{holds} or
 \textsc{violated}. It then locates the first step at which the solutions
 diverge, and finally returns \textsc{sound} or \textsc{flawed} per candidate
 with a failure type, the first flawed step quoted verbatim, and the fact that
 step should have asserted. Verification runs at temperature $0$. Asking for
-quoted evidence before a verdict is the design choice under test: it is meant
+quoted evidence before a verdict is the design choice under test. It is meant
 to force the checker to commit to specific, checkable claims about the problem
 text instead of judging fluency.
 
@@ -682,8 +684,8 @@ samples already disagree, and declines by default.
 We run stage~2 in two conditions that differ in nothing but which model is
 called. Under \emph{self-check} the solver verifies its own samples; under
 \emph{independent check} a single fixed checker verifies the samples of every
-solver. Everything else --- prompt, candidates, order, temperature, decision
-rule --- is held constant, so the contrast isolates the verifier.
+solver. Everything else (prompt, candidates, order, temperature, decision
+rule) is held constant, so the contrast isolates the verifier.
 
 \subsection{Methods compared}
 \label{sec:comparisons}
@@ -720,12 +722,12 @@ Every selector consumes the stage~0 samples unchanged and differs only in the
 evidence it reads off them. Table~\ref{tab:methods} sets out those differences.
 
 \noindent\textbf{Direct QA} is the one arm that does not. It draws its own four
-samples from a prompt that forbids reasoning and takes their majority,
-establishing that the benchmarks are not solvable by recall.
+samples from a prompt that forbids reasoning and takes their majority, which
+shows that the benchmarks are not solvable by recall.
 
 \noindent\textbf{CoT pass@1} is the accuracy of a single sample, and
-\textbf{CoT maj@4} \cite{wang2022self} the majority over four --- our baseline,
-and the answer every selector must either confirm or overturn. \textbf{CoT
+\textbf{CoT maj@4} \cite{wang2022self} the majority over four, which is our
+baseline and the answer every selector must either confirm or overturn. \textbf{CoT
 pass@4} marks an instance correct whenever any candidate is correct, giving the
 oracle ceiling of Eq.~\eqref{eq:bounds}.
 
