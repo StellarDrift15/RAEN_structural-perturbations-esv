@@ -1,9 +1,13 @@
+<div align="center">
+
 # Explicit Strategy Verification (ESV)
 
 **Gold-free answer selection without re-solving.**
 
 ![python](https://img.shields.io/badge/python-3.12-3776AB)
 ![license](https://img.shields.io/badge/license-Apache--2.0-green)
+
+</div>
 
 Self-consistency picks the majority answer among sampled chains of thought, so it selects by answer
 frequency alone and is blind to whether any candidate's reasoning is valid. For small open-weight
