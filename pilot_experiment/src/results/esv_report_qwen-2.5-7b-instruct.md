@@ -1,6 +1,6 @@
 # ESV evaluation report: `qwen/qwen-2.5-7b-instruct`
 
-- Dataset: `C:\Ekansh_Folders\Ekansh_Folders\2026\RAEN_structural-perturbations-esv\pilot_experiment\src\frozen_dataset.json` (32/32 instances scored)
+- Dataset: (32/32 instances scored)
 - Judge model (grades diagnosis and alternative strategy only): `openai/gpt-oss-120b`
 - Prompt version: `esv_v4_2026-10-14`, last updated 2026-10-15T04:33:04.263981+00:00
 - Pipeline: the model solves each problem; every genuine failure then goes through all five ESV stages: recognition (strategy check + independent re-solve), diagnosis, alternative strategy (3 verified candidates), recovery, and final answer (agreement of two independent derivations, adjudicated if they disagree).
