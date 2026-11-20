@@ -1,9 +1,5 @@
 # Baseline report: `qwen/qwen-2.5-7b-instruct`
 
-- Baseline version: `baselines_v1|esv_v4_2026-10-14` (prompts, call settings and scorer imported from methods/esv.py)
-- ESV results: `C:\Ekansh_Folders\Ekansh_Folders\2026\RAEN_structural-perturbations-esv\pilot_experiment\src\results\esv_results_qwen-2.5-7b-instruct.json`
-- Generated 2026-10-15T14:33:02.319184+00:00
-
 ## Accuracy
 
 | Method | Overall | Original | Perturbed | Drop (orig - pert) | Pairs both / orig only / pert only / neither |
