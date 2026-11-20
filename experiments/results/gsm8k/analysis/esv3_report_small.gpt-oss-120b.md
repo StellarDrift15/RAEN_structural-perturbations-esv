@@ -260,6 +260,96 @@ Stratified by what ESV decided, because the hypothesis is specific: the form sho
 | none | 46/303 (15.2%) | 6.5% |
 | ambiguous | 2/303 (0.7%) | 100.0% |
 
+## Robustness checks
+
+Each table below re-scores responses already stored, so none of it costs a model call.
+
+### Is the decision rule the bottleneck?
+
+Stage 3 accepts a candidate only if its verdict is SOUND *and* it lists no MISMATCH and no VIOLATED. If that is too strict, relaxing it should recover accuracy. Each row re-runs stage 3 over the same stored checks under a different acceptance rule.
+
+| rule | accepts | accuracy | vs CoT maj@4 | fixes / breaks | overturns | p |
+|---|---|---|---|---|---|---|
+| strict (as run) | verdict SOUND, zero MISMATCH, zero VIOLATED | 1094/1170 (93.5%) | +5.0 | 61 / 2 | 66 | 4e-16 |
+| verdict only | verdict SOUND, flagged lines ignored | 1094/1170 (93.5%) | +5.0 | 61 / 2 | 66 | 4e-16 |
+| tolerate one flag | verdict SOUND, at most one MISMATCH + VIOLATED | 1094/1170 (93.5%) | +5.0 | 61 / 2 | 66 | 4e-16 |
+| fewest flags | ignore the verdict; take the candidate with fewest flagged lines | 1070/1170 (91.5%) | +3.0 | 41 / 6 | 75 | 2e-07 |
+
+The first three rules coincide because the extra conditions are nearly always redundant: a SOUND verdict arrives with no flagged line almost every time, so dropping the flag conditions changes nothing. Only `fewest flags`, which can commit where nothing is SOUND, moves - and it is worse.
+
+| verdict | 0 flagged lines | >0 flagged lines | candidates | share with 0 flags |
+|---|---|---|---|---|
+| SOUND | 231 | 0 | 231 | 100.0% |
+| FLAWED | 114 | 404 | 518 | 22.0% |
+
+So the conservatism lives in the checker's verdict, not in the rule that reads it.
+
+### Does derivation length explain the rejections?
+
+The obvious reading of a falling true-positive rate is that longer derivations offer more to object to. 0.500 would mean length carries no signal; a value below 0.500 means FLAWED candidates are *shorter*, which contradicts the hypothesis.
+
+| verdict | candidates | median solution chars | P(FLAWED longer than SOUND) |
+|---|---|---|---|
+| SOUND | 231 | 723 |  |
+| FLAWED | 518 | 806 | 0.582 |
+
+### What would more samples buy? (maj@k by subsampling)
+
+Scores every k-subset of the 4 samples already drawn. This bounds the marginal value of another sample without paying for one. It is **not** a maj@8 measurement: it is an extrapolation from a decelerating curve, and a matched-compute maj@8 arm is still owed.
+
+| k | accuracy | marginal vs k-1 (pp) |
+|---|---|---|
+| maj@1 | 85.1% | - |
+| maj@2 | 84.7% | -0.48 |
+| maj@3 | 87.9% | +3.19 |
+| maj@4 | 88.5% | +0.60 |
+
+### Originals only (the arm the checker did not help accept)
+
+gpt-oss-120b was one of the two models that accepted each perturbed problem, so every accepted P' is one it answered correctly while blind to P: the perturbed arms measure the checker on a set filtered by its own competence. The untouched originals passed through no such filter. This is the same accuracy table restricted to them.
+
+| Method | accuracy | fixes | breaks | net vs CoT maj@4 | extra completion tokens / calls per instance |
+|---|---|---|---|---|---|
+| Direct QA maj@4 | 14.6% | 4 | 442 | -438 (p=2e-125) |  |
+| CoT pass@1 | 88.6% |  |  |  |  |
+| CoT maj@4 (initial) | 90.6% |  |  |  |  |
+| CoT pass@4 (oracle choice) | 95.7% |  |  |  |  |
+| Universal Self-Consistency | 91.5% | 9 | 4 | +5 (p=0.267) | 3 / 0.20 |
+| Judge-select (same checker, no ESV form) | 95.1% | 26 | 0 | +26 (p=3e-08) | 131 / 0.20 |
+| ESV v3 (stages 1-3) | 94.4% | 23 | 1 | +22 (p=3e-06) | 383 / 0.20 |
+
+### Which vote splits does ESV overturn?
+
+Eq. (2) only licenses an overturn where the likelihood ratio clears the prior odds on the majority, and those odds depend on the split. The threshold column is re-estimated on this benchmark's own candidates, so it is comparable with the Lambda measured here rather than with the GSM8K development value.
+
+| vote split | instances | P(majority correct) | P(a challenger correct) | Eq. (2) bar | overturns | fixes | breaks | net |
+|---|---|---|---|---|---|---|---|---|
+| 3-1 | 158 | 81.0% | 7.6% | 51.9 | 14 | 10 | 2 | +8 |
+| 2-1-1 | 81 | 55.6% | 16.7% | 6.3 | 25 | 24 | 0 | +24 |
+| 2-2 | 33 | 27.3% | 60.6% | 0.2 | 18 | 18 | 0 | +18 |
+| 1-1-1-1 | 31 | 9.7% | 12.9% | 0.7 | 9 | 9 | 0 | +9 |
+
+### Which vote splits does judge-select overturn?
+
+Eq. (2) only licenses an overturn where the likelihood ratio clears the prior odds on the majority, and those odds depend on the split. The threshold column is re-estimated on this benchmark's own candidates, so it is comparable with the Lambda measured here rather than with the GSM8K development value.
+
+| vote split | instances | P(majority correct) | P(a challenger correct) | Eq. (2) bar | overturns | fixes | breaks | net |
+|---|---|---|---|---|---|---|---|---|
+| 3-1 | 158 | 81.0% | 7.6% | 51.9 | 14 | 11 | 1 | +10 |
+| 2-1-1 | 81 | 55.6% | 16.7% | 6.3 | 26 | 25 | 0 | +25 |
+| 2-2 | 33 | 27.3% | 60.6% | 0.2 | 21 | 20 | 0 | +20 |
+| 1-1-1-1 | 31 | 9.7% | 12.9% | 0.7 | 12 | 11 | 0 | +11 |
+
+### Clustered intervals (source-problem bootstrap)
+
+The McNemar tests treat instances as independent. They are not: one source problem yields P and P' and is scored under every solver. These intervals resample whole source problems instead. They are secondary to the pre-registered exact tests; the check is whether any conclusion changes sign or loses its interval.
+
+| vs CoT maj@4 (198 source problems) | delta (pp) | 95% cluster CI | +/- |
+|---|---|---|---|
+| Universal Self-Consistency | +0.9 | [-0.1, +1.8] | 0.9 |
+| ESV v3 (stages 1-3) | +5.0 | [+3.6, +6.7] | 1.6 |
+| Judge-select (same checker, no ESV form) | +5.6 | [+4.1, +7.3] | 1.6 |
+
 ## Compute cost
 
 Read off the `usage` and `latency_seconds` stored on every call, so this section is reproducible offline from the records. Every method starts from the same 4 CoT samples and adds at most one call, so the baseline is shared and only the extra call separates them. **serial** is billed compute time; **critical path** is what a user waits for, since `run_methods.py` issues the 4 samples concurrently while the extra call cannot start until all 4 are back.

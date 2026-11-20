@@ -213,6 +213,59 @@ The same decision mix as above, split by model: a checker that almost never retu
 | several_sound | 4 | 100.0% | 100.0% | 0 | 0 | 4 |
 | none_sound | 12 | 33.3% | 33.3% | 0 | 0 | 8 |
 
+## Robustness checks
+
+Each table below re-scores responses already stored, so none of it costs a model call.
+
+### Is the decision rule the bottleneck?
+
+Stage 3 accepts a candidate only if its verdict is SOUND *and* it lists no MISMATCH and no VIOLATED. If that is too strict, relaxing it should recover accuracy. Each row re-runs stage 3 over the same stored checks under a different acceptance rule.
+
+| rule | accepts | accuracy | vs CoT maj@4 | fixes / breaks | overturns | p |
+|---|---|---|---|---|---|---|
+| strict (as run) | verdict SOUND, zero MISMATCH, zero VIOLATED | 996/1170 (85.1%) | -3.3 | 18 / 57 | 98 | 7e-06 |
+| verdict only | verdict SOUND, flagged lines ignored | 993/1170 (84.9%) | -3.6 | 20 / 62 | 107 | 4e-06 |
+| tolerate one flag | verdict SOUND, at most one MISMATCH + VIOLATED | 993/1170 (84.9%) | -3.6 | 19 / 61 | 105 | 3e-06 |
+| fewest flags | ignore the verdict; take the candidate with fewest flagged lines | 1034/1170 (88.4%) | -0.1 | 5 / 6 | 21 | 1.000 |
+
+The first three rules coincide because the extra conditions are nearly always redundant: a SOUND verdict arrives with no flagged line almost every time, so dropping the flag conditions changes nothing. Only `fewest flags`, which can commit where nothing is SOUND, moves - and it is worse.
+
+| verdict | 0 flagged lines | >0 flagged lines | candidates | share with 0 flags |
+|---|---|---|---|---|
+| SOUND | 326 | 21 | 347 | 93.9% |
+| FLAWED | 304 | 98 | 402 | 75.6% |
+
+So the conservatism lives in the checker's verdict, not in the rule that reads it.
+
+### Does derivation length explain the rejections?
+
+The obvious reading of a falling true-positive rate is that longer derivations offer more to object to. 0.500 would mean length carries no signal; a value below 0.500 means FLAWED candidates are *shorter*, which contradicts the hypothesis.
+
+| verdict | candidates | median solution chars | P(FLAWED longer than SOUND) |
+|---|---|---|---|
+| SOUND | 347 | 752 |  |
+| FLAWED | 402 | 802 | 0.554 |
+
+### What would more samples buy? (maj@k by subsampling)
+
+Scores every k-subset of the 4 samples already drawn. This bounds the marginal value of another sample without paying for one. It is **not** a maj@8 measurement: it is an extrapolation from a decelerating curve, and a matched-compute maj@8 arm is still owed.
+
+| k | accuracy | marginal vs k-1 (pp) |
+|---|---|---|
+| maj@1 | 85.1% | - |
+| maj@2 | 84.7% | -0.48 |
+| maj@3 | 87.9% | +3.19 |
+| maj@4 | 88.5% | +0.60 |
+
+### Clustered intervals (source-problem bootstrap)
+
+The McNemar tests treat instances as independent. They are not: one source problem yields P and P' and is scored under every solver. These intervals resample whole source problems instead. They are secondary to the pre-registered exact tests; the check is whether any conclusion changes sign or loses its interval.
+
+| vs CoT maj@4 (198 source problems) | delta (pp) | 95% cluster CI | +/- |
+|---|---|---|---|
+| Universal Self-Consistency | +0.9 | [-0.1, +1.8] | 0.9 |
+| ESV v3 (stages 1-3) | -3.3 | [-4.7, -2.0] | 1.4 |
+
 ## Compute cost
 
 Read off the `usage` and `latency_seconds` stored on every call, so this section is reproducible offline from the records. Every method starts from the same 4 CoT samples and adds at most one call, so the baseline is shared and only the extra call separates them. **serial** is billed compute time; **critical path** is what a user waits for, since `run_methods.py` issues the 4 samples concurrently while the extra call cannot start until all 4 are back.
