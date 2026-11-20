@@ -4,7 +4,6 @@
     "verifier_model": "openai/gpt-oss-120b",
     "version": "jee_esv3_v1_2026-11-03",
     "decision_rule": "stages1-3_strict_v1_2026-11-03",
-    "frozen_dataset": "C:\\Ekansh_Folders\\Ekansh_Folders\\2026\\RAEN_structural-perturbations-esv\\experiments\\data\\gsm8k\\frozen_dataset.json",
     "pairs": 198,
     "saved_at": "2026-11-12T00:14:16.274231+00:00"
   },
