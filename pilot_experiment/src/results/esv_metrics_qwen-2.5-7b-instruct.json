@@ -6,7 +6,6 @@
     "reasoning": "default",
     "judge_reasoning": "medium",
     "solver_max_tokens": 4000,
-    "input_file": "C:\\Ekansh_Folders\\Ekansh_Folders\\2026\\RAEN_structural-perturbations-esv\\pilot_experiment\\src\\frozen_dataset.json",
     "perturbation_generator_models": {
       "a": "deepseek/deepseek-v4-flash-0731",
       "b": "qwen/qwen3.5-35b-a3b",
