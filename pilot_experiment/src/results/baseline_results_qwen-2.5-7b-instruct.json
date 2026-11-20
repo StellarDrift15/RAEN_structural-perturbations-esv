@@ -4,7 +4,6 @@
     "reasoning": "default",
     "max_tokens": 4000,
     "version": "baselines_v1|esv_v4_2026-10-14",
-    "input_file": "C:\\Ekansh_Folders\\Ekansh_Folders\\2026\\RAEN_structural-perturbations-esv\\pilot_experiment\\src\\frozen_dataset.json",
     "methods": [
       "dqa",
       "cot"
