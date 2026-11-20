@@ -14,7 +14,10 @@ esv3_records.json: USC asks the solver, not the verifier, so run_esv3.py measure
 """
 
 import argparse
+import bisect
+import itertools
 import json
+import random
 import statistics
 import sys
 from collections import Counter
@@ -114,6 +117,11 @@ def base_row(inst: Dict[str, Any], naive: Optional[str] = None) -> Dict[str, Any
     trap = naive is not None and arm == "breaking" and inst["problem_type"] == "perturbed"
     return {
         "id": inst["instance_id"], "format": fmt_, "arm": arm,
+        # Kept for the robustness section: `pair` clusters P and P' (and every solver) onto one source problem,
+        # and the per-sample fields let maj@k be re-scored by subsampling the 4 samples already paid for.
+        "pair": inst["pair_id"], "gold": gold,
+        "cot_norm": norm,
+        "cot_len": [len((s.get("raw_response") or "")) for s in cot],
         "trap_majority": trap and answers_match(maj, naive, fmt_),  # the majority answer IS the trap answer
         "trap_samples": sum(answers_match(a, naive, fmt_) for a in norm) if trap else None,
         "unanimous": len(candidates_of(cot, fmt_)) < 2,  # the same grouping run_esv3.py gates on
@@ -604,6 +612,309 @@ def judge_select_section(rows: List[Dict[str, Any]]) -> List[str]:
     return out
 
 
+# --- Robustness: is the DECISION RULE the bottleneck, or the checker's verdict? ----------------------
+# Every function below re-scores the STORED checks and samples. No model call, no new data.
+
+RULE_VARIANTS = (
+    ("strict (as run)", "verdict SOUND, zero MISMATCH, zero VIOLATED"),
+    ("verdict only", "verdict SOUND, flagged lines ignored"),
+    ("tolerate one flag", "verdict SOUND, at most one MISMATCH + VIOLATED"),
+    ("fewest flags", "ignore the verdict; take the candidate with fewest flagged lines"),
+)
+
+
+def _flags(check: Dict[str, Any]) -> Optional[int]:
+    if check.get("mismatches") is None and check.get("violations") is None:
+        return None
+    return (check.get("mismatches") or 0) + (check.get("violations") or 0)
+
+
+def _decide_variant(cands, checks, variant: str):
+    """The stage-3 rule under a relaxed strictness setting. Mirrors run_esv3.decide's tie-breaks exactly."""
+    if len(cands) < 2:
+        return None
+    if not checks or all(c["verdict"] is None for c in checks):
+        return None
+    if variant == "strict (as run)":
+        keep = [i for i, c in enumerate(checks) if is_sound(c, True)]
+    elif variant == "verdict only":
+        keep = [i for i, c in enumerate(checks) if is_sound(c, False)]
+    elif variant == "tolerate one flag":
+        keep = [i for i, c in enumerate(checks) if is_sound(c, False) and (_flags(c) or 0) <= 1]
+    else:  # fewest flags: the only variant that can commit where nothing is SOUND
+        have = [(i, _flags(c)) for i, c in enumerate(checks) if _flags(c) is not None]
+        if not have:
+            return None
+        low = min(f for _, f in have)
+        keep = [i for i, f in have if f == low]
+    if not keep:
+        return None
+    return max(keep, key=lambda i: (cands[i]["votes"], cands[i]["is_initial"], -i))
+
+
+def strictness_table(rows: List[Dict[str, Any]]) -> str:
+    """Reviewer question: is ESV's abstention our rule's conservatism or the checker's? Re-score every variant."""
+    scored = [r for r in rows if "v3" in r]
+    if not scored:
+        return ""
+    base = sum(r["correct"]["cot_maj"] for r in scored)
+    out = []
+    for name, note in RULE_VARIANTS:
+        ok = fixes = breaks = commits = 0
+        for r in scored:
+            v3 = r["v3"]
+            pick = _decide_variant(v3["candidates"], v3["methods"]["esv3"]["checks"], name)
+            if pick is None:
+                correct = r["correct"]["cot_maj"]
+            else:
+                cand = v3["candidates"][pick]
+                correct = bool(cand["correct"])
+                commits += int(cand["normalized"] != v3["initial"]["normalized"])
+            ok += correct
+            fixes += int(correct and not r["correct"]["cot_maj"])
+            breaks += int(r["correct"]["cot_maj"] and not correct)
+        p = mcnemar_exact(fixes, breaks)
+        out.append([name, note, pct(ok, len(scored)), f"{100.0 * (ok - base) / len(scored):+.1f}",
+                    f"{fixes} / {breaks}", commits,
+                    "-" if p is None else (f"{p:.3f}" if p >= 0.001 else f"{p:.0e}")])
+    return table(["rule", "accepts", "accuracy", "vs CoT maj@4", "fixes / breaks", "overturns", "p"], out)
+
+
+def verdict_flag_table(rows: List[Dict[str, Any]]) -> str:
+    """Why the variants above coincide: a SOUND verdict almost never arrives WITH a flagged line."""
+    pairs = Counter()
+    for r in rows:
+        if "v3" not in r or len(r["v3"]["candidates"]) < 2:
+            continue
+        for c in r["v3"]["methods"]["esv3"]["checks"]:
+            f = _flags(c)
+            if c["verdict"] is None or f is None:
+                continue
+            pairs[(c["verdict"], "0 flags" if f == 0 else ">0 flags")] += 1
+    if not pairs:
+        return ""
+    rows_out = []
+    for verdict in ("SOUND", "FLAWED"):
+        a, b = pairs[(verdict, "0 flags")], pairs[(verdict, ">0 flags")]
+        rows_out.append([verdict, a, b, a + b, rate(a, a + b)])
+    return table(["verdict", "0 flagged lines", ">0 flagged lines", "candidates", "share with 0 flags"], rows_out)
+
+
+def length_test(rows: List[Dict[str, Any]]) -> str:
+    """Tests the stated explanation for the TPR collapse: do longer derivations draw more FLAWED verdicts?
+
+    Reports P(a FLAWED candidate is longer than a SOUND one), the rank-sum (Mann-Whitney) statistic. 0.5 = no
+    relation; >0.5 supports the hypothesis. A reversal across benchmarks is evidence against it.
+    """
+    sound, flawed = [], []
+    for r in rows:
+        if "v3" not in r:
+            continue
+        v3 = r["v3"]
+        if len(v3["candidates"]) < 2:
+            continue
+        for cand, check in zip(v3["candidates"], v3["methods"]["esv3"]["checks"]):
+            idx = cand.get("sample_index")
+            if check["verdict"] is None or idx is None or idx >= len(r["cot_len"]):
+                continue
+            (sound if check["verdict"] == "SOUND" else flawed).append(r["cot_len"][idx])
+    if not sound or not flawed:
+        return ""
+    merged = sorted(sound + flawed)
+
+    def avg_rank(v):
+        return (bisect.bisect_left(merged, v) + bisect.bisect_right(merged, v) + 1) / 2.0
+
+    u = sum(avg_rank(v) for v in flawed) - len(flawed) * (len(flawed) + 1) / 2.0
+    auc = u / (len(flawed) * len(sound))
+    return table(["verdict", "candidates", "median solution chars", "P(FLAWED longer than SOUND)"],
+                 [["SOUND", len(sound), f"{statistics.median(sound):.0f}", ""],
+                  ["FLAWED", len(flawed), f"{statistics.median(flawed):.0f}", f"{auc:.3f}"]])
+
+
+def majk_table(rows: List[Dict[str, Any]]) -> str:
+    """maj@k for k = 1..4 by scoring every k-subset of the 4 samples already drawn.
+
+    This is the closest offline stand-in for a matched-compute maj@8 arm: it shows what the MARGINAL sample is
+    still worth at k = 4. It is an extrapolation, not a measurement of maj@8, and the report says so.
+    """
+    usable = [r for r in rows if len(r.get("cot_norm") or []) == 4]
+    if not usable:
+        return ""
+    means = {}
+    for k in (1, 2, 3, 4):
+        per_instance = []
+        for r in usable:
+            hits = []
+            for sub in itertools.combinations(range(4), k):
+                vals = [r["cot_norm"][i] for i in sub if r["cot_norm"][i] is not None]
+                if not vals:
+                    hits.append(0.0)
+                    continue
+                win = majority_answer(vals, r["format"])
+                hits.append(1.0 if score_answer(win, r["gold"], r["format"])["correct"] else 0.0)
+            per_instance.append(sum(hits) / len(hits))
+        means[k] = 100.0 * sum(per_instance) / len(per_instance)
+    out = [[f"maj@{k}", f"{means[k]:.1f}%", "-" if k == 1 else f"{means[k] - means[k - 1]:+.2f}"] for k in (1, 2, 3, 4)]
+    return table(["k", "accuracy", "marginal vs k-1 (pp)"], out)
+
+
+def cluster_table(rows: List[Dict[str, Any]], arms, resamples: int = 5000, seed: int = 7) -> str:
+    """95% intervals from a bootstrap that resamples SOURCE PROBLEMS, not instances.
+
+    The exact McNemar tests treat instances as independent, but one source problem yields P and P' and is scored
+    under every solver, so it contributes several correlated rows. Resampling whole pairs absorbs both.
+    """
+    by_pair: Dict[Any, List[Dict[str, Any]]] = {}
+    for r in rows:
+        by_pair.setdefault(r["pair"], []).append(r)
+    pairs = sorted(by_pair, key=str)
+    if not pairs:
+        return ""
+
+    def delta(sample_pairs, arm):
+        n = hit = 0
+        for p in sample_pairs:
+            for r in by_pair[p]:
+                if arm not in r["correct"] or r["correct"][arm] is None:
+                    continue
+                n += 1
+                hit += int(bool(r["correct"][arm])) - int(bool(r["correct"]["cot_maj"]))
+        return (100.0 * hit / n) if n else None
+
+    rnd = random.Random(seed)
+    draws = [[pairs[rnd.randrange(len(pairs))] for _ in pairs] for _ in range(resamples)]
+    out = []
+    for arm in arms:
+        obs = delta(pairs, arm)
+        if obs is None:
+            continue
+        ds = sorted(d for d in (delta(s, arm) for s in draws) if d is not None)
+        lo, hi = ds[int(0.025 * len(ds))], ds[int(0.975 * len(ds)) - 1]
+        out.append([LABELS.get(arm, arm), f"{obs:+.1f}", f"[{lo:+.1f}, {hi:+.1f}]", f"{(hi - lo) / 2:.1f}"])
+    return table([f"vs CoT maj@4 ({len(pairs)} source problems)", "delta (pp)", "95% cluster CI", "+/-"], out)
+
+
+def _split_label(cands) -> str:
+    """The vote split as Eq. (2) reads it: group sizes, largest first (e.g. 3-1, 2-1-1, 2-2).
+
+    Samples whose answer could not be parsed are dropped by candidates_of, so a split can total fewer than 4.
+    Those are pooled into one row rather than shown as separate splits, which they are only by accident.
+    """
+    votes = sorted((c["votes"] for c in cands), reverse=True)
+    return "-".join(str(v) for v in votes) if sum(votes) == 4 else "fewer than 4 readable"
+
+
+def vote_split_table(rows: List[Dict[str, Any]], method: str = "esv3") -> str:
+    """Fixes and breaks bucketed by the vote split that was overturned, with the bar Eq. (2) sets for that split.
+
+    Eq. (2) licenses an overturn only where the likelihood ratio clears the ratio of prior ODDS on the majority
+    and on the challenger, and those odds depend on the split: a 3-1 majority is a far stronger prior than a
+    2-1-1 plurality or a 2-2 tie. The threshold here is the same quantity rho(v_m)/rho(v_c) the paper defines,
+    but estimated on THIS benchmark's own candidates and conditioned on the whole split, instead of being
+    carried over from the GSM8K development split. That is what makes it comparable with the Lambda measured
+    on the same benchmark.
+    """
+    buckets: Dict[str, Dict[str, int]] = {}
+    for r in rows:
+        if "v3" not in r or method not in r["correct"]:
+            continue
+        cands = r["v3"]["candidates"]
+        if len(cands) < 2:  # gate closed; no overturn is possible
+            continue
+        b = buckets.setdefault(_split_label(cands),
+                               {"n": 0, "maj_ok": 0, "chal": 0, "chal_ok": 0, "over": 0, "fix": 0, "brk": 0})
+        b["n"] += 1
+        for c in cands:
+            if c.get("is_initial"):
+                b["maj_ok"] += int(bool(c.get("correct")))
+            else:
+                b["chal"] += 1
+                b["chal_ok"] += int(bool(c.get("correct")))
+        if r["v3"]["methods"][method].get("changed"):
+            b["over"] += 1
+            if r["correct"][method] and not r["correct"]["cot_maj"]:
+                b["fix"] += 1
+            elif not r["correct"][method] and r["correct"]["cot_maj"]:
+                b["brk"] += 1
+
+    def odds(hits: int, n: int) -> Optional[float]:
+        if not n:
+            return None
+        p = hits / n
+        return None if p >= 1.0 else p / (1 - p)
+
+    out = []
+    for lab, b in sorted(buckets.items(), key=lambda kv: (kv[0] == "fewer than 4 readable", -kv[1]["n"])):
+        om, oc = odds(b["maj_ok"], b["n"]), odds(b["chal_ok"], b["chal"])
+        if om is None or oc is None:
+            thr = "n/a"
+        elif oc == 0:
+            thr = "inf"
+        else:
+            thr = f"{om / oc:.1f}"
+        out.append([lab, b["n"], f"{100 * b['maj_ok'] / b['n']:.1f}%",
+                    f"{100 * b['chal_ok'] / b['chal']:.1f}%" if b["chal"] else "-", thr,
+                    b["over"], b["fix"], b["brk"], f"{b['fix'] - b['brk']:+d}"])
+    return table(["vote split", "instances", "P(majority correct)", "P(a challenger correct)",
+                  "Eq. (2) bar", "overturns", "fixes", "breaks", "net"], out) if out else ""
+
+
+def robustness_section(rows: List[Dict[str, Any]]) -> List[str]:
+    """Everything here re-scores stored responses. No model calls, so it regenerates offline like every other table."""
+    arms = [a for a in ("usc", "esv3", "judge_select") if any(a in r["correct"] for r in rows)]
+    out = ["## Robustness checks", "",
+           "Each table below re-scores responses already stored, so none of it costs a model call.", "",
+           "### Is the decision rule the bottleneck?", "",
+           "Stage 3 accepts a candidate only if its verdict is SOUND *and* it lists no MISMATCH and no VIOLATED. "
+           "If that is too strict, relaxing it should recover accuracy. Each row re-runs stage 3 over the same "
+           "stored checks under a different acceptance rule.", "",
+           strictness_table(rows), ""]
+    vf = verdict_flag_table(rows)
+    if vf:
+        out += ["The first three rules coincide because the extra conditions are nearly always redundant: a SOUND "
+                "verdict arrives with no flagged line almost every time, so dropping the flag conditions changes "
+                "nothing. Only `fewest flags`, which can commit where nothing is SOUND, moves - and it is worse.", "",
+                vf, "",
+                "So the conservatism lives in the checker's verdict, not in the rule that reads it.", ""]
+    lt = length_test(rows)
+    if lt:
+        out += ["### Does derivation length explain the rejections?", "",
+                "The obvious reading of a falling true-positive rate is that longer derivations offer more to "
+                "object to. 0.500 would mean length carries no signal; a value below 0.500 means FLAWED "
+                "candidates are *shorter*, which contradicts the hypothesis.", "", lt, ""]
+    mk = majk_table(rows)
+    if mk:
+        out += ["### What would more samples buy? (maj@k by subsampling)", "",
+                "Scores every k-subset of the 4 samples already drawn. This bounds the marginal value of another "
+                "sample without paying for one. It is **not** a maj@8 measurement: it is an extrapolation from a "
+                "decelerating curve, and a matched-compute maj@8 arm is still owed.", "", mk, ""]
+    orig = [r for r in rows if r["arm"] == "original"]
+    if orig and len(orig) != len(rows):
+        out += ["### Originals only (the arm the checker did not help accept)", "",
+                "gpt-oss-120b was one of the two models that accepted each perturbed problem, so every accepted P' "
+                "is one it answered correctly while blind to P: the perturbed arms measure the checker on a set "
+                "filtered by its own competence. The untouched originals passed through no such filter. This is "
+                "the same accuracy table restricted to them.", "",
+                accuracy_table(orig), ""]
+    for meth, name in (("esv3", "ESV"), ("judge_select", "judge-select")):
+        vs = vote_split_table(rows, meth)
+        if vs:
+            out += [f"### Which vote splits does {name} overturn?", "",
+                    "Eq. (2) only licenses an overturn where the likelihood ratio clears the prior odds on the "
+                    "majority, and those odds depend on the split. The threshold column is re-estimated on this "
+                    "benchmark's own candidates, so it is comparable with the Lambda measured here rather than "
+                    "with the GSM8K development value.", "", vs, ""]
+    ct = cluster_table(rows, arms)
+    if ct:
+        out += ["### Clustered intervals (source-problem bootstrap)", "",
+                "The McNemar tests treat instances as independent. They are not: one source problem yields P and "
+                "P' and is scored under every solver. These intervals resample whole source problems instead. "
+                "They are secondary to the pre-registered exact tests; the check is whether any conclusion "
+                "changes sign or loses its interval.", "", ct, ""]
+    return out
+
+
 def go_no_go(rows: List[Dict[str, Any]]) -> str:
     n = len(rows)
     d_maj = 100 * (sum(r["correct"]["esv3"] for r in rows) - sum(r["correct"]["cot_maj"] for r in rows)) / n
@@ -700,6 +1011,7 @@ def main(argv: List[str] = None) -> int:
         for model, rows in per_model.items():
             out += [f"**{model}**", "", decision_table(rows), ""]
         out += judge_select_section(pooled)
+        out += robustness_section(pooled)
         out += ["## Compute cost", "",
                 "Read off the `usage` and `latency_seconds` stored on every call, so this section is reproducible "
                 "offline from the records. Every method starts from the same 4 CoT samples and adds at most one "

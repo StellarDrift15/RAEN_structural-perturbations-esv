@@ -48,9 +48,8 @@ significance on none. It passed the pre-registered criterion (≥ +3 pp over maj
 scoring 94.1% on the 813 held-out GSM8K instances against 88.8% for maj@4.
 
 **Who checks decides the sign.** Swapping the checker for the solver itself reverses the gain on every
-benchmark (−3.3 / −2.3 / −2.2 pp); same-size cross-verification loses too (NeMo↔Gemma on MATH-500:
-−1.6 and −5.5 pp). A SOUND verdict carries a likelihood ratio of 1.6 (self) against 47.5
-(`gpt-oss-120b`) on GSM8K, while overturning a 3–1 vote needs Λ > 32. The shortfall is in the
+benchmark (−3.3 / −2.3 / −2.2 pp). A SOUND verdict carries a likelihood ratio of 1.6 (self) against
+47.5 (`gpt-oss-120b`) on GSM8K, while overturning a 3–1 vote needs Λ > 32. The shortfall is in the
 evidence, not the decision rule.
 
 **The structured form is not what pays.** Dropping it for free-form judge-select *raises* the gain
@@ -123,8 +122,8 @@ python experiments/analyze_esv3.py --benchmark gsm8k --models small --verifier-m
 python experiments/analyze_esv3.py --benchmark gsm8k --models small --verifier-model openai/gpt-oss-120b --min-pair 60  # held-out
 ```
 
-**Live run.** Put `OPENROUTER_API_KEY=...` in `experiments/.env` (git-ignored) or point `RAEN_ENV_FILE`
-at one. Every step resumes where it stopped.
+**Live run.** Put `OPENROUTER_API_KEY=...` in `experiments/.env` or point `RAEN_ENV_FILE` at one.
+Every step resumes where it stopped.
 
 ```bash
 B=gsm8k   # or math500, jeebench
@@ -144,8 +143,7 @@ python experiments/analyze_esv3.py --benchmark $B --models small \
 ```
 
 Check stage 1 before paying for the checker: no disagreement, or no fixable disagreement, means no
-headroom. Omit `--verifier-model` for the self-check condition; pass a solver name to it for
-same-size cross-verification.
+headroom. Omit `--verifier-model` for the self-check condition.
 
 Hosted providers drift and sampling is at T = 0.7, so a live re-run approximates rather than
 bit-reproduces the committed records.
@@ -180,8 +178,8 @@ for stage-by-stage tables; [`method_prompts.py`](experiments/method_prompts.py) 
 
 - **Selection only.** ESV chooses among existing candidates, so CoT pass@4 is a hard ceiling and
   stage-4 repair is not built. Abstentions grow with difficulty (72 → 379 → 612 instances).
-- **Checker strength is confounded with independence.** `gpt-oss-120b` is larger than the solvers;
-  same-size cross-verification fails, which narrows but does not settle the question.
+- **Checker strength is confounded with independence.** `gpt-oss-120b` is larger than the solvers, so
+  the experiments do not separate "a stronger checker" from "a different checker".
 - **The form earns interpretability, not accuracy.** Free-form judge-select is stronger on all three
   benchmarks.
 - **Benchmark is model-generated.** Perturbations are produced and verified by models (acceptance
@@ -191,8 +189,8 @@ for stage-by-stage tables; [`method_prompts.py`](experiments/method_prompts.py) 
 - **Strategy-misfit reading is GSM8K-only.** The trap explains 18.5% of wrong majority answers there
   but 5.6% on MATH-500.
 - One sample set per instance, so seed variance is unmeasured. No pinned `requirements.txt` yet.
-- Models are served via [OpenRouter](https://openrouter.ai); **never commit API keys** (`.env` is
-  git-ignored).
+- All models are served through [OpenRouter](https://openrouter.ai), so provider-side changes can move
+  the live numbers.
 
 ## Citation and license
 
