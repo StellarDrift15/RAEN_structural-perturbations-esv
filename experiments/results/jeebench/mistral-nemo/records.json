@@ -7,7 +7,6 @@
     "sample_temperature": 0.7,
     "solver_max_tokens": 4000,
     "reasoning": "default",
-    "frozen_dataset": "C:\\Ekansh_Folders\\Ekansh_Folders\\2026\\RAEN_structural-perturbations-esv\\jeebench_experiment\\data\\frozen_dataset.json",
     "pairs": 193,
     "saved_at": "2026-11-03T03:19:37.874516+00:00"
   },

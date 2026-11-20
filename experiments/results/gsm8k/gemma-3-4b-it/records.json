@@ -7,7 +7,6 @@
     "sample_temperature": 0.7,
     "solver_max_tokens": 4000,
     "reasoning": "default",
-    "frozen_dataset": "C:\\Ekansh_Folders\\Ekansh_Folders\\2026\\RAEN_structural-perturbations-esv\\experiments\\data\\gsm8k\\frozen_dataset.json",
     "pairs": 198,
     "saved_at": "2026-11-04T07:07:10.159974+00:00"
   },
