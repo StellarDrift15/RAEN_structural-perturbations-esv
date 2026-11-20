@@ -72,8 +72,6 @@ ENV_FILE_NAMES = (".env", "env")  # Windows Explorer can save the file without i
 
 
 def find_env_file() -> Optional[Path]:
-    """The .env (OPENROUTER_API_KEY) is kept outside the repo, e.g. C:\\Ekansh_Folders\\Ekansh_Folders\\2026\\env.
-    Uses the RAEN_ENV_FILE environment variable if set, else the nearest .env/env file in a parent folder."""
     if os.getenv("RAEN_ENV_FILE"):
         return Path(os.environ["RAEN_ENV_FILE"])
     return next((folder / name for folder in SCRIPT_DIR.parents for name in ENV_FILE_NAMES if (folder / name).is_file()), None)
