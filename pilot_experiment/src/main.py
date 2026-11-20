@@ -33,7 +33,6 @@ except ModuleNotFoundError:
         A_FIELDS, SOLVE_FIELDS, STRATEGY_FIELDS,
     )
 
-# Fetch the API key from the .env kept outside the repo (e.g. C:\Ekansh_Folders\Ekansh_Folders\2026\env):
 # RAEN_ENV_FILE if set, else the nearest .env or env file (Explorer can drop the leading dot) in a parent folder.
 def find_env_file():
   if os.environ.get("RAEN_ENV_FILE"):
